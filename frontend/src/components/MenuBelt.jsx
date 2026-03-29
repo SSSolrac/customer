@@ -3,9 +3,7 @@ import "./MenuBelt.css";
 
 // Default category images
 import coffee from "../assets/coffee.png";
-import frappe from "../assets/frappe.png";
 import hot from "../assets/hot.png";
-import soda from "../assets/soda.png";
 import sandwiches from "../assets/sandwiches.png";
 import rice from "../assets/ricemeal.png"; // Added this so your rice meals don't look like hot coffee!
 

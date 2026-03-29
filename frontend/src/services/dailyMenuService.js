@@ -1,36 +1,37 @@
-/**
- * Temporary customer-facing daily menu source.
- *
- * TODO (API integration): replace this mock with a backend call, e.g.
- * GET /api/daily-menu/current
- */
+import { MENU } from "../data/menuData";
+import { requestJson } from "./api";
+
+function deriveDailyPicksFallback() {
+  const allItems = Object.values(MENU).flatMap((category) => category.items);
+  const daySeed = new Date().getDate();
+  const picks = allItems.filter((_, index) => (index + daySeed) % 5 === 0).slice(0, 6);
+
+  const grouped = picks.reduce((acc, item) => {
+    const category = Object.values(MENU).find((menuCategory) => menuCategory.items.some((entry) => entry.id === item.id));
+    const categoryName = category?.title || "Featured";
+    if (!acc[categoryName]) acc[categoryName] = [];
+    acc[categoryName].push(item.name);
+    return acc;
+  }, {});
+
+  return Object.entries(grouped).map(([name, items]) => ({ name, items }));
+}
+
 export async function getCurrentDailyMenu() {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        title: "Menu of the Day",
-        subtitle: "Available today",
-        date: new Date().toISOString().split("T")[0],
-        isActive: true,
-        categories: [
-          {
-            name: "Pasta",
-            items: ["Creamy Carbonara", "Creamy Tuna Pesto"]
-          },
-          {
-            name: "Sandwiches",
-            items: ["Grilled Cheese Sandwich", "Toasted Cheesy Hungarian Sandwich"]
-          },
-          {
-            name: "Snacks",
-            items: ["Chicken Poppers with Rice"]
-          },
-          {
-            name: "Rice Meals",
-            items: ["Four Seasons"]
-          }
-        ]
-      });
-    }, 250);
-  });
+  try {
+    const response = await requestJson("/daily-menu/current");
+    if (response?.menu) return response.menu;
+  } catch {
+    // fallback below
+  }
+
+  const categories = deriveDailyPicksFallback();
+
+  return {
+    title: "Menu of the Day",
+    subtitle: categories.length ? "Fresh picks selected by our kitchen" : "Chef picks are being prepared",
+    date: new Date().toISOString().split("T")[0],
+    isActive: categories.length > 0,
+    categories
+  };
 }

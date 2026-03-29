@@ -15,7 +15,7 @@ function MenuOfTheDay({ menuData }) {
         </div>
 
         <p className="daily-menu__empty">
-          No featured dishes today yet. Please check back soon for today&apos;s picks.
+          Today&apos;s chef picks are not published yet. You can still order from the full menu below.
         </p>
       </section>
     );
@@ -26,6 +26,7 @@ function MenuOfTheDay({ menuData }) {
       <div className="daily-menu__header">
         <h2>{menuData.title}</h2>
         <p>{menuData.subtitle}</p>
+        <small>{new Date(menuData.date).toLocaleDateString()}</small>
       </div>
 
       <div className="daily-menu__categories">
