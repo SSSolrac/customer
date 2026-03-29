@@ -1,8 +1,8 @@
 import { ApiError, isApiAvailableError, requestJson } from "./api";
+import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
 
-const ORDER_STORE_KEY = "happyTailsOrders_v1";
-const LATEST_ORDER_KEY = "happyTailsLatestOrder_v1";
-const SESSION_STORAGE_KEY = "happyTailsSession_v2";
+const ORDER_STORE_KEY = "happyTailsOrders_v2";
+const LATEST_ORDER_KEY = "happyTailsLatestOrder_v2";
 
 const STATUS_STEPS_BY_TYPE = {
   Delivery: ["Pending", "Preparing", "Out for Delivery", "Delivered"],
@@ -11,32 +11,34 @@ const STATUS_STEPS_BY_TYPE = {
   Takeout: ["Pending", "Preparing", "Ready for Takeout", "Picked Up"]
 };
 
-function getCustomerId() {
-  try {
-    const session = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
-    return session?.user?.id || "guest";
-  } catch {
-    return "guest";
-  }
+function getCustomerScopedKeys(customerId = getSessionCustomerId()) {
+  return {
+    ordersKey: getScopedStorageKey(ORDER_STORE_KEY, customerId),
+    latestKey: getScopedStorageKey(LATEST_ORDER_KEY, customerId)
+  };
 }
 
-function readOrders() {
+function readOrders(customerId = getSessionCustomerId()) {
   try {
-    return JSON.parse(localStorage.getItem(ORDER_STORE_KEY) || "[]");
+    const { ordersKey } = getCustomerScopedKeys(customerId);
+    return JSON.parse(localStorage.getItem(ordersKey) || "[]");
   } catch {
     return [];
   }
 }
 
-function writeOrders(orders) {
-  localStorage.setItem(ORDER_STORE_KEY, JSON.stringify(orders));
+function writeOrders(orders, customerId = getSessionCustomerId()) {
+  const { ordersKey } = getCustomerScopedKeys(customerId);
+  localStorage.setItem(ordersKey, JSON.stringify(orders));
 }
 
-function cacheOrder(order) {
-  const orders = readOrders().filter((item) => item.id !== order.id);
+function cacheOrder(order, customerId = order?.customerId || getSessionCustomerId()) {
+  const orders = readOrders(customerId).filter((item) => item.id !== order.id);
   orders.unshift(order);
-  writeOrders(orders);
-  localStorage.setItem(LATEST_ORDER_KEY, order.id);
+  writeOrders(orders, customerId);
+
+  const { latestKey } = getCustomerScopedKeys(customerId);
+  localStorage.setItem(latestKey, order.id);
 }
 
 function makeOrderId() {
@@ -46,6 +48,61 @@ function makeOrderId() {
 
 function shouldFallbackToLocal(error) {
   return isApiAvailableError(error) || (error instanceof ApiError && error.status >= 500);
+}
+
+function toMs(value) {
+  return new Date(value).getTime() || 0;
+}
+
+function withTimeline(order) {
+  if (!order) return null;
+
+  const customerId = order.customerId || getSessionCustomerId();
+  const createdAt = order.createdAt || order.updatedAt || new Date().toISOString();
+  const steps = getStatusSteps(order.orderType);
+  const currentIndex = Math.max(steps.findIndex((step) => step.toLowerCase() === order.status?.toLowerCase()), 0);
+
+  const existingTimeline = Array.isArray(order.statusTimeline) ? order.statusTimeline : [];
+  const timelineByStatus = new Map(existingTimeline.map((entry) => [entry.status, entry.at]));
+
+  let pointer = toMs(createdAt);
+  const fallbackTimeline = steps.slice(0, currentIndex + 1).map((step, index) => {
+    const proposed = timelineByStatus.get(step);
+    if (proposed) {
+      pointer = Math.max(pointer, toMs(proposed));
+      return { status: step, at: new Date(pointer).toISOString() };
+    }
+
+    if (index === 0) return { status: step, at: createdAt };
+
+    pointer += 4 * 60 * 1000;
+    return { status: step, at: new Date(pointer).toISOString() };
+  });
+
+  const normalizedTimeline = [...existingTimeline, ...fallbackTimeline]
+    .filter((entry) => entry?.status)
+    .sort((a, b) => toMs(a.at) - toMs(b.at))
+    .reduce((acc, entry) => {
+      if (!acc.some((saved) => saved.status === entry.status)) {
+        acc.push({ status: entry.status, at: entry.at || createdAt });
+      }
+      return acc;
+    }, []);
+
+  return {
+    ...order,
+    customerId,
+    createdAt,
+    updatedAt: order.updatedAt || normalizedTimeline.at(-1)?.at || createdAt,
+    statusTimeline: normalizedTimeline
+  };
+}
+
+function normalizeAndFilterOrders(orders, customerId = getSessionCustomerId()) {
+  return orders
+    .map(withTimeline)
+    .filter((order) => order?.customerId === customerId)
+    .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
 
 export function getStatusSteps(orderType) {
@@ -84,17 +141,18 @@ export async function validateCheckout(orderPayload) {
 
 async function createLocalOrder(orderPayload) {
   const now = new Date().toISOString();
-  const order = {
+  const customerId = orderPayload.customerId || getSessionCustomerId();
+  const order = withTimeline({
     id: makeOrderId(),
-    customerId: orderPayload.customerId || getCustomerId(),
+    customerId,
     createdAt: now,
     updatedAt: now,
     status: "Pending",
     statusTimeline: [{ status: "Pending", at: now }],
     ...orderPayload
-  };
+  });
 
-  cacheOrder(order);
+  cacheOrder(order, customerId);
   return order;
 }
 
@@ -111,8 +169,9 @@ export async function createOrder(orderPayload) {
       method: "POST",
       body: orderPayload
     });
-    cacheOrder(response.order);
-    return response.order;
+    const order = withTimeline(response.order);
+    cacheOrder(order, order.customerId);
+    return order;
   } catch (error) {
     if (!shouldFallbackToLocal(error)) throw error;
     return createLocalOrder(orderPayload);
@@ -120,18 +179,23 @@ export async function createOrder(orderPayload) {
 }
 
 export async function getLatestOrder() {
+  const customerId = getSessionCustomerId();
+
   try {
     const response = await requestJson("/orders/latest");
-    cacheOrder(response.order);
-    return response.order;
+    const order = withTimeline(response.order);
+    if (!order || order.customerId !== customerId) return null;
+    cacheOrder(order, customerId);
+    return order;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (!shouldFallbackToLocal(error)) throw error;
 
-    const latestId = localStorage.getItem(LATEST_ORDER_KEY);
+    const { latestKey } = getCustomerScopedKeys(customerId);
+    const latestId = localStorage.getItem(latestKey);
     if (!latestId) return null;
 
-    const orders = readOrders();
+    const orders = readOrders(customerId).map(withTimeline);
     return orders.find((order) => order.id === latestId) || null;
   }
 }
@@ -139,32 +203,40 @@ export async function getLatestOrder() {
 export async function getOrderById(orderId) {
   if (!orderId) return null;
 
+  const customerId = getSessionCustomerId();
+
   try {
     const response = await requestJson(`/orders/${orderId}`);
-    cacheOrder(response.order);
-    return response.order;
+    const order = withTimeline(response.order);
+    if (!order || order.customerId !== customerId) return null;
+    cacheOrder(order, customerId);
+    return order;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (!shouldFallbackToLocal(error)) throw error;
 
-    const orders = readOrders();
+    const orders = readOrders(customerId).map(withTimeline);
     return orders.find((order) => order.id === orderId) || null;
   }
 }
 
 export async function getOrderHistory() {
+  const customerId = getSessionCustomerId();
+
   try {
     const response = await requestJson("/orders");
     if (Array.isArray(response.orders)) {
-      writeOrders(response.orders);
-      if (response.orders[0]?.id) {
-        localStorage.setItem(LATEST_ORDER_KEY, response.orders[0].id);
+      const normalized = normalizeAndFilterOrders(response.orders, customerId);
+      writeOrders(normalized, customerId);
+      if (normalized[0]?.id) {
+        const { latestKey } = getCustomerScopedKeys(customerId);
+        localStorage.setItem(latestKey, normalized[0].id);
       }
-      return response.orders;
+      return normalized;
     }
     return [];
   } catch (error) {
     if (!shouldFallbackToLocal(error)) throw error;
-    return readOrders();
+    return readOrders(customerId).map(withTimeline);
   }
 }

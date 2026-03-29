@@ -7,6 +7,11 @@ function formatMoney(value) {
   return `₱${Number(value || 0).toFixed(2)}`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
 export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
   const [expandedId, setExpandedId] = useState("");
@@ -30,14 +35,14 @@ export default function OrderHistory() {
     loadHistory();
   }, []);
 
-  if (isLoading) return <div className="history-state">Loading order history...</div>;
+  if (isLoading) return <div className="history-state">Loading your order history...</div>;
   if (error) return <div className="history-state history-error">{error}</div>;
 
   if (!orders.length) {
     return (
       <div className="history-state">
         <h2>No orders yet</h2>
-        <p>Once you place your first order, your order timeline and receipts will appear here.</p>
+        <p>Once you place your first order, your timeline and receipts will appear here.</p>
         <Link to="/order">Start an order</Link>
       </div>
     );
@@ -46,7 +51,7 @@ export default function OrderHistory() {
   return (
     <div className="history-page">
       <h1>Order History</h1>
-      <p className="history-subtitle">Your recent paid and in-progress orders are listed below.</p>
+      <p className="history-subtitle">Your account-specific order activity is listed below.</p>
       <div className="history-list">
         {orders.map((order) => {
           const isExpanded = expandedId === order.id;
@@ -57,7 +62,7 @@ export default function OrderHistory() {
                 <span className="status-pill">{order.status}</span>
               </div>
 
-              <p>{new Date(order.createdAt).toLocaleString()}</p>
+              <p>Placed: {formatDateTime(order.createdAt)}</p>
               <p>
                 {order.orderType} • {order.payment} • {order.items.length} items • <strong>{formatMoney(order.total)}</strong>
               </p>
@@ -71,10 +76,7 @@ export default function OrderHistory() {
                 <button type="button" onClick={() => setExpandedId(isExpanded ? "" : order.id)}>
                   {isExpanded ? "Hide details" : "View details"}
                 </button>
-                <button type="button" className="ghost-btn" title="Coming soon">
-                  Repeat order
-                </button>
-                <Link to={`/track-order`}>Track</Link>
+                <Link to="/track-order">Track status</Link>
               </div>
 
               {isExpanded ? (

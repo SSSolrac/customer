@@ -1,7 +1,17 @@
 import "./LoyaltyCard.css";
 
 function LoyaltyCard({ loyaltyData }) {
-  const { stampCount, stampsRequired, rewardAvailable, customerName, recentActivity = [], totalEligibleOrders = 0 } = loyaltyData;
+  const {
+    stampCount,
+    stampsRequired,
+    rewardAvailable,
+    rewardsRedeemable = 0,
+    customerName,
+    recentActivity = [],
+    totalEligibleOrders = 0,
+    completedOrdersCount = 0,
+    progressMessage = ""
+  } = loyaltyData;
 
   const earnedStamps = Math.min(stampCount, stampsRequired);
   const stampsToGo = Math.max(stampsRequired - earnedStamps, 0);
@@ -19,7 +29,7 @@ function LoyaltyCard({ loyaltyData }) {
     <section className="loyalty-card" aria-label="Customer loyalty card">
       <div className="loyalty-card__header">
         <h2>Loyalty Card</h2>
-        <p>Collect 8 coffee-based orders and get 1 drink reward</p>
+        <p>Every completed coffee-based order adds 1 stamp.</p>
       </div>
 
       {customerName ? <p className="loyalty-card__customer">Hi {customerName}, welcome back.</p> : null}
@@ -39,23 +49,24 @@ function LoyaltyCard({ loyaltyData }) {
 
       <div className="loyalty-card__footer">
         <p>{earnedStamps} / {stampsRequired} stamps</p>
+        <p>{progressMessage}</p>
         {rewardAvailable ? (
-          <strong className="loyalty-card__reward">🎉 Reward ready on your next checkout!</strong>
+          <strong className="loyalty-card__reward">🎉 {rewardsRedeemable} free drink reward{rewardsRedeemable > 1 ? "s" : ""} ready at checkout.</strong>
         ) : (
-          <span>{stampsToGo} more to unlock a free drink</span>
+          <span>{stampsToGo} more completed coffee orders to unlock a free drink.</span>
         )}
       </div>
 
       <div className="loyalty-card__meta">
-        <p>Total eligible orders: {totalEligibleOrders}</p>
+        <p>{completedOrdersCount} completed orders • {totalEligibleOrders} coffee-eligible</p>
         {recentActivity.length ? (
           <ul>
             {recentActivity.map((entry) => (
-              <li key={entry.id}>{entry.id} • {new Date(entry.earnedAt).toLocaleDateString()} • +{entry.points} stamp</li>
+              <li key={entry.id}>{entry.id} • {new Date(entry.earnedAt).toLocaleDateString()} • {entry.status} • +{entry.points} stamp</li>
             ))}
           </ul>
         ) : (
-          <p>Your recent completed orders will appear here.</p>
+          <p>Your completed coffee orders will appear here.</p>
         )}
       </div>
     </section>
