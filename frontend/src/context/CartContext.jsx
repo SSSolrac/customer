@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const CartContext = createContext(null);
@@ -19,8 +20,7 @@ export function CartProvider({ children }) {
   }, [cart]);
 
   const addItem = (item) => {
-    // item: { id, name, price, image, category }
-    setCart((prev) => {
+      setCart((prev) => {
       const existing = prev.find((x) => x.id === item.id);
       if (existing) {
         return prev.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x));

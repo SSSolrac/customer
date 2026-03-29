@@ -1,9 +1,10 @@
 import "./LoyaltyCard.css";
 
 function LoyaltyCard({ loyaltyData }) {
-  const { stampCount, stampsRequired, rewardAvailable, customerName } = loyaltyData;
+  const { stampCount, stampsRequired, rewardAvailable, customerName, recentActivity = [], totalEligibleOrders = 0 } = loyaltyData;
 
   const earnedStamps = Math.min(stampCount, stampsRequired);
+  const stampsToGo = Math.max(stampsRequired - earnedStamps, 0);
   const stampSlots = Array.from({ length: stampsRequired }, (_, index) => {
     const isFilled = index < earnedStamps;
 
@@ -18,12 +19,10 @@ function LoyaltyCard({ loyaltyData }) {
     <section className="loyalty-card" aria-label="Customer loyalty card">
       <div className="loyalty-card__header">
         <h2>Loyalty Card</h2>
-        <p>Buy 8 drinks, get 1 free</p>
+        <p>Every completed coffee order earns a stamp. Collect 8 for a free drink reward.</p>
       </div>
 
-      {customerName ? (
-        <p className="loyalty-card__customer">Hi {customerName}, keep collecting stamps!</p>
-      ) : null}
+      {customerName ? <p className="loyalty-card__customer">Hi {customerName}, welcome back.</p> : null}
 
       <div className="loyalty-card__grid" role="list" aria-label="Loyalty stamp progress">
         {stampSlots.map(({ key, slotNumber, isFilled }) => (
@@ -40,7 +39,24 @@ function LoyaltyCard({ loyaltyData }) {
 
       <div className="loyalty-card__footer">
         <p>{earnedStamps} / {stampsRequired} stamps</p>
-        {rewardAvailable ? <strong className="loyalty-card__reward">🎉 Free drink unlocked!</strong> : null}
+        {rewardAvailable ? (
+          <strong className="loyalty-card__reward">🎉 Reward unlocked from your completed orders!</strong>
+        ) : (
+          <span>{stampsToGo} more completed coffee orders to unlock a free drink</span>
+        )}
+      </div>
+
+      <div className="loyalty-card__meta">
+        <p>Total completed coffee orders counted: {totalEligibleOrders}</p>
+        {recentActivity.length ? (
+          <ul>
+            {recentActivity.map((entry) => (
+              <li key={entry.id}>{entry.id} • {new Date(entry.earnedAt).toLocaleDateString()} • +{entry.points} stamp</li>
+            ))}
+          </ul>
+        ) : (
+          <p>Your recent completed orders will appear here.</p>
+        )}
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import { useSession } from "../context/SessionContext";
 import { createOrder, validateCheckout } from "../services/orderService";
 import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
 import "./Checkout.css";
@@ -18,6 +19,7 @@ const defaultForm = {
 export default function Checkout() {
   const navigate = useNavigate();
   const { cart, total, clearCart } = useCart();
+  const { user } = useSession();
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,21 +30,23 @@ export default function Checkout() {
       if (!profile) return;
       setForm((prev) => ({
         ...prev,
-        name: profile.fullName || "",
-        phone: profile.phone || "",
-        address: profile.address || ""
+        name: profile?.fullName || user?.fullName || "",
+        phone: profile?.phone || "",
+        address: profile?.address || ""
       }));
     };
 
     loadProfile();
-  }, []);
+  }, [user?.fullName]);
 
   const payload = useMemo(
     () => ({
+      customerId: user?.id || "guest",
       customer: {
         name: form.name,
         phone: form.phone,
-        address: form.address
+        address: form.address,
+        email: user?.email || ""
       },
       orderType: form.orderType,
       payment: form.payment,
@@ -51,7 +55,7 @@ export default function Checkout() {
       items: cart,
       total
     }),
-    [cart, form, total]
+    [cart, form, total, user?.email, user?.id]
   );
 
   const handleFieldChange = (key, value) => {

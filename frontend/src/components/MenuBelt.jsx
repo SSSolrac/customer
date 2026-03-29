@@ -1,13 +1,10 @@
-// src/components/MenuBelt.jsx
 import "./MenuBelt.css";
 
 // Default category images
 import coffee from "../assets/coffee.png";
-import frappe from "../assets/frappe.png";
 import hot from "../assets/hot.png";
-import soda from "../assets/soda.png";
 import sandwiches from "../assets/sandwiches.png";
-import rice from "../assets/ricemeal.png"; // Added this so your rice meals don't look like hot coffee!
+import rice from "../assets/ricemeal.png"; 
 
 // Specific item images (.jpg based on your folder)
 import chocoJavaFrappe from "../assets/Choco Java Chip Frappe.jpg";
@@ -15,18 +12,17 @@ import blueberrySoda from "../assets/Blueberry Soda.jpg";
 
 const items = [
   { name: "Cloud Americano", tagLeft: "Iced Coffee", tagRight: "₱120", img: coffee },
-  { name: "Choco Java Chip Frappe", tagLeft: "Frappuccino", tagRight: "₱170", img: chocoJavaFrappe }, // Uses specific picture
+  { name: "Choco Java Chip Frappe", tagLeft: "Frappuccino", tagRight: "₱170", img: chocoJavaFrappe }, 
   { name: "Chicken Cordon Bleu", tagLeft: "Rice Meal", tagRight: "₱180", img: rice },
   { name: "Spanish Latte", tagLeft: "Hot Coffee", tagRight: "₱120", img: hot },
-  { name: "Blueberry Soda", tagLeft: "Non-Caff", tagRight: "₱90", img: blueberrySoda }, // Uses specific picture
+  { name: "Blueberry Soda", tagLeft: "Non-Caff", tagRight: "₱90", img: blueberrySoda }, 
   { name: "Chicken Alfredo Pasta", tagLeft: "Pasta", tagRight: "₱190", img: sandwiches },
   { name: "Iced Cocoa Tiramisu", tagLeft: "Iced Coffee", tagRight: "₱160", img: coffee },
   { name: "Burger Steak", tagLeft: "Rice Meal", tagRight: "₱160", img: rice },
 ];
 
 export default function MenuBelt() {
-  // Duplicate items so the loop looks continuous
-  const beltItems = [...items, ...items];
+    const beltItems = [...items, ...items];
 
   return (
     <section className="belt-section">
