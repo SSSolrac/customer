@@ -1,39 +1,51 @@
-import { useEffect, useMemo, useState } from "react";
-import { getLatestOrder, getStatusSteps } from "../services/orderService";
+import { useCallback, useMemo, useState } from "react";
+import { getLatestOrder, getOrderById, getStatusSteps } from "../services/orderService";
 
 export function useOrderTracking() {
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let mounted = true;
+  const loadLatest = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const latest = await getLatestOrder();
+      setOrder(latest);
+      return latest;
+    } catch {
+      setError("We couldn't load your latest order right now.");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    const loadOrder = async () => {
-      setIsLoading(true);
-      try {
-        const latest = await getLatestOrder();
-        if (!mounted) return;
-        setOrder(latest);
-      } catch {
-        if (!mounted) return;
-        setError("We couldn't load your latest order right now.");
-      } finally {
-        if (mounted) setIsLoading(false);
+  const lookupByOrderId = useCallback(async (orderId) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const found = await getOrderById(orderId.trim());
+      if (!found) {
+        setOrder(null);
+        setError("We couldn't find an order with that ID.");
+        return null;
       }
-    };
-
-    loadOrder();
-
-    return () => {
-      mounted = false;
-    };
+      setOrder(found);
+      return found;
+    } catch {
+      setError("We couldn't look up that order right now.");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const steps = useMemo(() => getStatusSteps(order?.orderType), [order?.orderType]);
   const currentStepIndex = useMemo(() => {
     if (!order) return -1;
-    return steps.findIndex((step) => step.toLowerCase() === order.status.toLowerCase());
+    return steps.findIndex((step) => step.toLowerCase() === order.status?.toLowerCase());
   }, [order, steps]);
 
   return {
@@ -41,6 +53,8 @@ export function useOrderTracking() {
     isLoading,
     error,
     steps,
-    currentStepIndex
+    currentStepIndex,
+    loadLatest,
+    lookupByOrderId
   };
 }

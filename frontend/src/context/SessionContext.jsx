@@ -1,40 +1,71 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  buildAnonymousSession,
+  getOrCreateDeviceId,
+  getStoredSession,
+  normalizeEmail,
+  SESSION_STORAGE_KEY
+} from "../services/sessionIdentity";
 
 const SessionContext = createContext(null);
 
-export function SessionProvider({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
+function getInitialSession() {
+  getOrCreateDeviceId();
+  return getStoredSession();
+}
 
-  useEffect(() => {
-    const savedAuth = localStorage.getItem("isAuthenticated") === "true";
-    const savedGuest = localStorage.getItem("isGuest") === "true";
-    setIsAuthenticated(savedAuth);
-    setIsGuest(savedGuest);
+export function SessionProvider({ children }) {
+  const [session, setSession] = useState(getInitialSession);
+  const deviceId = useMemo(() => getOrCreateDeviceId(), []);
+
+  const persistSession = useCallback((nextSession) => {
+    setSession(nextSession);
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
   }, []);
 
-  const signIn = () => {
-    setIsAuthenticated(true);
-    setIsGuest(false);
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.removeItem("isGuest");
-  };
+  const signIn = useCallback(({ email, fullName }) => {
+    const normalizedEmail = normalizeEmail(email);
+    persistSession({
+      status: "authenticated",
+      user: {
+        id: `user:${normalizedEmail}`,
+        email: normalizedEmail,
+        fullName: fullName?.trim() || "Happy Tails Customer",
+        role: "customer"
+      },
+      lastLoginAt: new Date().toISOString()
+    });
+  }, [persistSession]);
 
-  const continueAsGuest = () => {
-    setIsGuest(true);
-    setIsAuthenticated(false);
-    localStorage.setItem("isGuest", "true");
-    localStorage.removeItem("isAuthenticated");
-  };
+  const continueAsGuest = useCallback(() => {
+    persistSession({
+      status: "guest",
+      user: {
+        id: `guest:${deviceId}`,
+        fullName: "Guest",
+        role: "guest"
+      },
+      lastLoginAt: new Date().toISOString()
+    });
+  }, [deviceId, persistSession]);
 
-  const signOut = () => {
-    setIsAuthenticated(false);
-    setIsGuest(false);
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("isGuest");
-  };
+  const signOut = useCallback(() => {
+    const anonymous = buildAnonymousSession();
+    setSession(anonymous);
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(anonymous));
+  }, []);
 
-  const value = useMemo(() => ({ isAuthenticated, isGuest, signIn, continueAsGuest, signOut }), [isAuthenticated, isGuest]);
+  const value = useMemo(() => ({
+    session,
+    user: session.user,
+    isAuthenticated: session.status === "authenticated",
+    isGuest: session.status === "guest",
+    canAccessAccount: session.status === "authenticated",
+    signIn,
+    continueAsGuest,
+    signOut
+  }), [continueAsGuest, session, signIn, signOut]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

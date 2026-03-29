@@ -11,7 +11,6 @@ import grilledCheese from "../assets/Grilled Cheese Sandwich.jpg";
 import hungarianSandwich from "../assets/Toasted Cheesy Hungarian Sandwich.jpg";
 import chickenPoppers from "../assets/Chicken Poppers with Rice.jpg";
 import americanoIced from "../assets/Americano (Iced).jpg";
-import caramelMacchiato from "../assets/Caramel Macchiato.jpg";
 import americanoHot from "../assets/Americano (Hot).jpg";
 import fourSeasons from "../assets/Four Seasons.jpg";
 import hotChoco from "../assets/Hot Chocolate.jpg";

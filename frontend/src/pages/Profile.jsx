@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import LoyaltyCard from "../components/loyalty/LoyaltyCard";
 import { getCustomerLoyaltyData } from "../services/loyaltyService";
 import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
+import { useSession } from "../context/SessionContext";
 import "./Profile.css";
 
 const blankProfile = {
@@ -15,42 +16,53 @@ const blankProfile = {
 };
 
 function Profile() {
+  const { user, session } = useSession();
   const [formData, setFormData] = useState(blankProfile);
   const [loyaltyData, setLoyaltyData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     const loadProfile = async () => {
-      const profile = await getCustomerProfile();
-      if (profile) setFormData((prev) => ({ ...prev, ...profile }));
+      setIsLoading(true);
+      setError("");
+      try {
+        const profile = await getCustomerProfile();
+        const mergedProfile = {
+          ...blankProfile,
+          fullName: user?.fullName || "",
+          email: user?.email || "",
+          ...profile
+        };
+        setFormData(mergedProfile);
+
+        const data = await getCustomerLoyaltyData(mergedProfile.fullName);
+        setLoyaltyData(data);
+      } catch {
+        setError("We couldn't load your account details right now.");
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadProfile();
-  }, []);
-
-  useEffect(() => {
-    const loadLoyaltyData = async () => {
-      // TODO(API): replace mock call with GET /api/loyalty/me.
-      const data = await getCustomerLoyaltyData();
-      setLoyaltyData(data);
-    };
-
-    loadLoyaltyData();
-  }, []);
+  }, [user?.email, user?.fullName]);
 
   const handleChange = (event) => {
     setFormData({ ...formData, [event.target.name]: event.target.value });
     setErrors((prev) => ({ ...prev, [event.target.name]: "" }));
+    setMessage("");
   };
 
   const handleSave = async (event) => {
     event.preventDefault();
     const nextErrors = {};
     if (!formData.fullName.trim()) nextErrors.fullName = "Name is required.";
-    if (!formData.phone.trim()) nextErrors.phone = "Phone is required.";
-    if (!formData.email.trim()) nextErrors.email = "Email is required.";
+    if (!/^\+?[0-9\-\s]{7,15}$/.test(formData.phone.trim())) nextErrors.phone = "Enter a valid phone number.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) nextErrors.email = "Enter a valid email address.";
 
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
@@ -58,14 +70,29 @@ function Profile() {
     }
 
     setIsSaving(true);
-    await saveCustomerProfile(formData);
-    setMessage("Profile saved. Checkout will auto-fill these details.");
-    setIsSaving(false);
+    setError("");
+    try {
+      await saveCustomerProfile(formData);
+      setMessage("Profile saved. Checkout will use your latest details automatically.");
+      const data = await getCustomerLoyaltyData(formData.fullName);
+      setLoyaltyData(data);
+    } catch {
+      setError("Unable to save right now. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return <div className="loyalty-loading">Loading your profile...</div>;
+  }
 
   return (
     <div className="profile-page">
       <h1>My Profile</h1>
+      <p className="profile-session">Signed in as <strong>{session.user?.email}</strong></p>
+
+      {error ? <p className="field-error profile-top-error">{error}</p> : null}
 
       {loyaltyData ? <LoyaltyCard loyaltyData={loyaltyData} /> : <p className="loyalty-loading">Loading loyalty card...</p>}
 

@@ -7,7 +7,7 @@ import { useSession } from "../context/SessionContext";
 
 function Navbar({ onSignOut, onOpenModal }) {
   const { cartCount } = useCart();
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, isGuest, user } = useSession();
 
   return (
     <nav className="navbar" style={{ backgroundColor: "#ffffff" }}>
@@ -40,6 +40,11 @@ function Navbar({ onSignOut, onOpenModal }) {
               <img src={profileIcon} alt="Profile" className="profile-icon" style={{ filter: "brightness(0)" }} />
             </Link>
             <button className="auth-btn" onClick={onSignOut} style={{ color: "#000000" }}>Sign Out</button>
+          </>
+        ) : isGuest ? (
+          <>
+            <span style={{ fontSize: ".85rem", color: "#444" }}>Browsing as {user?.fullName || "Guest"}</span>
+            <button className="auth-btn" onClick={onSignOut} style={{ color: "#000000" }}>Sign In</button>
           </>
         ) : (
           <button className="auth-btn" onClick={onOpenModal} style={{ color: "#000000" }}>Sign Up / Login</button>
