@@ -1,21 +1,17 @@
-/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 const SESSION_STORAGE_KEY = "happyTailsSession_v2";
-const DEVICE_ID_KEY = "happyTailsDeviceId_v1";
 
 const SessionContext = createContext(null);
 
-function getOrCreateDeviceId() {
-  const existing = localStorage.getItem(DEVICE_ID_KEY);
-  if (existing) return existing;
+function getInitialSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    if (saved?.status) return saved;
+  } catch {
+    // ignore parsing errors and use anonymous state
+  }
 
-  const generated = `device-${Math.random().toString(36).slice(2, 10)}`;
-  localStorage.setItem(DEVICE_ID_KEY, generated);
-  return generated;
-}
-
-function buildAnonymousSession() {
   return {
     status: "anonymous",
     user: null,
@@ -23,24 +19,8 @@ function buildAnonymousSession() {
   };
 }
 
-function getInitialSession() {
-  const deviceId = getOrCreateDeviceId();
-
-  try {
-    const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
-    if (saved?.status && (saved?.user || saved.status === "anonymous")) {
-      return saved;
-    }
-  } catch {
-    // ignore parsing errors and use anonymous state
-  }
-
-  return buildAnonymousSession(deviceId);
-}
-
 export function SessionProvider({ children }) {
   const [session, setSession] = useState(getInitialSession);
-  const deviceId = useMemo(() => getOrCreateDeviceId(), []);
 
   const persistSession = useCallback((nextSession) => {
     setSession(nextSession);
@@ -48,14 +28,12 @@ export function SessionProvider({ children }) {
   }, []);
 
   const signIn = useCallback(({ email, fullName }) => {
-    const normalizedEmail = (email || "customer@happytails.cafe").trim().toLowerCase();
     persistSession({
       status: "authenticated",
       user: {
-        id: `user:${normalizedEmail}`,
-        email: normalizedEmail,
-        fullName: fullName?.trim() || "Happy Tails Customer",
-        role: "customer"
+        id: email || "customer-demo",
+        email: email || "customer@happytails.cafe",
+        fullName: fullName || "Happy Tails Customer"
       },
       lastLoginAt: new Date().toISOString()
     });
@@ -64,19 +42,14 @@ export function SessionProvider({ children }) {
   const continueAsGuest = useCallback(() => {
     persistSession({
       status: "guest",
-      user: {
-        id: `guest:${deviceId}`,
-        fullName: "Guest",
-        role: "guest"
-      },
+      user: { id: "guest", fullName: "Guest" },
       lastLoginAt: new Date().toISOString()
     });
-  }, [deviceId, persistSession]);
+  }, [persistSession]);
 
   const signOut = useCallback(() => {
-    const anonymous = buildAnonymousSession();
-    setSession(anonymous);
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(anonymous));
+    setSession({ status: "anonymous", user: null, lastLoginAt: null });
+    localStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 
   const value = useMemo(() => ({

@@ -7,16 +7,6 @@ function formatMoney(value) {
   return `₱${Number(value || 0).toFixed(2)}`;
 }
 
-function formatDateTime(value) {
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
 export default function OrderHistory() {
   const [orders, setOrders] = useState([]);
   const [expandedId, setExpandedId] = useState("");
@@ -67,7 +57,7 @@ export default function OrderHistory() {
                 <span className="status-pill">{order.status}</span>
               </div>
 
-              <p>{formatDateTime(order.createdAt)}</p>
+              <p>{new Date(order.createdAt).toLocaleString()}</p>
               <p>
                 {order.orderType} • {order.payment} • {order.items.length} items • <strong>{formatMoney(order.total)}</strong>
               </p>
@@ -78,13 +68,13 @@ export default function OrderHistory() {
               </p>
 
               <div className="history-actions">
-                <button type="button" aria-expanded={isExpanded} onClick={() => setExpandedId(isExpanded ? "" : order.id)}>
+                <button type="button" onClick={() => setExpandedId(isExpanded ? "" : order.id)}>
                   {isExpanded ? "Hide details" : "View details"}
                 </button>
                 <button type="button" className="ghost-btn" title="Coming soon">
                   Repeat order
                 </button>
-                <Link to={`/track-order?orderId=${encodeURIComponent(order.id)}`}>Track</Link>
+                <Link to={`/track-order`}>Track</Link>
               </div>
 
               {isExpanded ? (

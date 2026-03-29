@@ -19,7 +19,7 @@ function LoyaltyCard({ loyaltyData }) {
     <section className="loyalty-card" aria-label="Customer loyalty card">
       <div className="loyalty-card__header">
         <h2>Loyalty Card</h2>
-        <p>Every completed coffee order earns a stamp. Collect 8 for a free drink reward.</p>
+        <p>Collect 8 coffee-based orders and get 1 drink reward</p>
       </div>
 
       {customerName ? <p className="loyalty-card__customer">Hi {customerName}, welcome back.</p> : null}
@@ -40,14 +40,14 @@ function LoyaltyCard({ loyaltyData }) {
       <div className="loyalty-card__footer">
         <p>{earnedStamps} / {stampsRequired} stamps</p>
         {rewardAvailable ? (
-          <strong className="loyalty-card__reward">🎉 Reward unlocked from your completed orders!</strong>
+          <strong className="loyalty-card__reward">🎉 Reward ready on your next checkout!</strong>
         ) : (
-          <span>{stampsToGo} more completed coffee orders to unlock a free drink</span>
+          <span>{stampsToGo} more to unlock a free drink</span>
         )}
       </div>
 
       <div className="loyalty-card__meta">
-        <p>Total completed coffee orders counted: {totalEligibleOrders}</p>
+        <p>Total eligible orders: {totalEligibleOrders}</p>
         {recentActivity.length ? (
           <ul>
             {recentActivity.map((entry) => (
