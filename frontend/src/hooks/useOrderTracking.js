@@ -29,7 +29,7 @@ export function useOrderTracking() {
       const found = await getOrderById(orderId.trim());
       if (!found) {
         setOrder(null);
-        setError("We couldn't find an order with that ID.");
+        setError("We couldn't find that order on this account. Check the ID and try again.");
         return null;
       }
       setOrder(found);

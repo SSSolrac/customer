@@ -1,21 +1,37 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createUserIdentity, getSessionStorageKey, getStoredSession } from "../services/sessionService";
 
-const SESSION_STORAGE_KEY = "happyTailsSession_v2";
+const SESSION_STORAGE_KEY = getSessionStorageKey();
 
 const SessionContext = createContext(null);
 
 function getInitialSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
-    if (saved?.status) return saved;
-  } catch {
-    // ignore parsing errors and use anonymous state
+  const saved = getStoredSession();
+
+  if (saved?.status === "authenticated") {
+    return {
+      status: "authenticated",
+      user: createUserIdentity({ ...saved.user, status: "authenticated" }),
+      lastLoginAt: saved.lastLoginAt || new Date().toISOString(),
+      lastActiveAt: saved.lastActiveAt || new Date().toISOString()
+    };
+  }
+
+  if (saved?.status === "guest") {
+    return {
+      status: "guest",
+      user: createUserIdentity({ ...saved.user, status: "guest" }),
+      lastLoginAt: saved.lastLoginAt || new Date().toISOString(),
+      lastActiveAt: saved.lastActiveAt || new Date().toISOString()
+    };
   }
 
   return {
     status: "anonymous",
     user: null,
-    lastLoginAt: null
+    lastLoginAt: null,
+    lastActiveAt: null
   };
 }
 
@@ -23,32 +39,37 @@ export function SessionProvider({ children }) {
   const [session, setSession] = useState(getInitialSession);
 
   const persistSession = useCallback((nextSession) => {
-    setSession(nextSession);
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    const enhanced = {
+      ...nextSession,
+      lastActiveAt: new Date().toISOString()
+    };
+
+    setSession(enhanced);
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(enhanced));
   }, []);
 
   const signIn = useCallback(({ email, fullName }) => {
+    const now = new Date().toISOString();
     persistSession({
       status: "authenticated",
-      user: {
-        id: email || "customer-demo",
-        email: email || "customer@happytails.cafe",
-        fullName: fullName || "Happy Tails Customer"
-      },
-      lastLoginAt: new Date().toISOString()
+      user: createUserIdentity({ email, fullName, status: "authenticated" }),
+      lastLoginAt: now,
+      lastActiveAt: now
     });
   }, [persistSession]);
 
   const continueAsGuest = useCallback(() => {
+    const now = new Date().toISOString();
     persistSession({
       status: "guest",
-      user: { id: "guest", fullName: "Guest" },
-      lastLoginAt: new Date().toISOString()
+      user: createUserIdentity({ status: "guest" }),
+      lastLoginAt: now,
+      lastActiveAt: now
     });
   }, [persistSession]);
 
   const signOut = useCallback(() => {
-    setSession({ status: "anonymous", user: null, lastLoginAt: null });
+    setSession({ status: "anonymous", user: null, lastLoginAt: null, lastActiveAt: null });
     localStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 

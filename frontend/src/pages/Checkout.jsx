@@ -19,7 +19,7 @@ const defaultForm = {
 export default function Checkout() {
   const navigate = useNavigate();
   const { cart, total, clearCart } = useCart();
-  const { user } = useSession();
+  const { user, isAuthenticated, isGuest } = useSession();
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,6 +106,9 @@ export default function Checkout() {
         <h1>Checkout</h1>
         <Link to="/cart">← Back to Cart</Link>
       </div>
+      <p className="profile-session">
+        Ordering as <strong>{isAuthenticated ? (user?.email || user?.fullName) : (isGuest ? "Guest" : "Anonymous")}</strong>
+      </p>
 
       <div className="checkout-layout">
         <form className="checkout-card" onSubmit={submit}>
@@ -170,13 +173,13 @@ export default function Checkout() {
           {cart.map((item) => (
             <div className="summary-row" key={item.id}>
               <span>{item.name} × {item.qty}</span>
-              <span>₱{item.price * item.qty}</span>
+              <span>₱{(item.price * item.qty).toFixed(2)}</span>
             </div>
           ))}
           <hr />
           <div className="summary-row total-row">
             <span>Total</span>
-            <span>₱{total}</span>
+            <span>₱{Number(total || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
