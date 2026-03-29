@@ -21,8 +21,8 @@ import pattern from "./assets/pattern.png";
 import { useSession } from "./context/SessionContext";
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useSession();
-  return isAuthenticated ? children : <Navigate to="/" replace />;
+  const { canAccessAccount } = useSession();
+  return canAccessAccount ? children : <Navigate to="/" replace />;
 }
 
 function App() {
@@ -51,8 +51,8 @@ function App() {
     };
   }, [location.pathname]);
 
-  const handleLogin = () => {
-    signIn();
+  const handleLogin = (credentials) => {
+    signIn(credentials);
     setShowModal(false);
   };
 

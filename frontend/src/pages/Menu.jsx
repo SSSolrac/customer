@@ -7,36 +7,49 @@ import { getCurrentDailyMenu } from "../services/dailyMenuService";
 import { useEffect, useMemo, useState } from "react";
 import "./Menu.css";
 
+const FEATURED_KEYWORDS = ["Caramel", "Matcha", "Hungarian", "Four Seasons", "Americano"];
+
 function Menu() {
   const [dailyMenu, setDailyMenu] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const load = async () => {
-      const data = await getCurrentDailyMenu();
-      setDailyMenu(data);
-      setIsLoading(false);
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await getCurrentDailyMenu();
+        setDailyMenu(data);
+      } catch {
+        setError("Could not load today's featured menu right now.");
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     load();
   }, []);
 
   const featuredItems = useMemo(() => {
-    return Object.values(MENU)
-      .flatMap((category) => category.items)
-      .slice(0, 6)
-      .map((item, index) => ({ ...item, soldOut: index % 4 === 0 }));
+    const allItems = Object.values(MENU).flatMap((category) => category.items);
+
+    const matched = allItems.filter((item) => FEATURED_KEYWORDS.some((keyword) => item.name.includes(keyword)));
+    const fallback = allItems.filter((item) => item.price >= 130 && item.price <= 170);
+
+    return (matched.length ? matched : fallback).slice(0, 6).map((item) => ({
+      ...item,
+      availability: item.price > 175 ? "Limited" : "Available"
+    }));
   }, []);
 
   return (
     <div className="menu-page">
       <h1 className="menu-title">Our Café Menu</h1>
 
-      {isLoading ? (
-        <p className="menu-loading">Loading menu of the day...</p>
-      ) : (
-        <MenuOfTheDay menuData={dailyMenu} />
-      )}
+      {isLoading ? <p className="menu-loading">Loading menu of the day...</p> : null}
+      {!isLoading && error ? <p className="menu-loading">{error}</p> : null}
+      {!isLoading && !error ? <MenuOfTheDay menuData={dailyMenu} /> : null}
 
       <section className="featured-grid">
         {featuredItems.map((item) => (
@@ -44,7 +57,7 @@ function Menu() {
             <img src={item.image} alt={item.name} />
             <h3>{item.name}</h3>
             <p>₱{item.price}</p>
-            {item.soldOut ? <span className="sold-out">Sold Out</span> : <span className="available">Available</span>}
+            <span className={item.availability === "Available" ? "available" : "sold-out"}>{item.availability}</span>
           </article>
         ))}
       </section>

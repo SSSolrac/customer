@@ -1,12 +1,24 @@
+import { ApiError, isApiAvailableError, requestJson } from "./api";
+
 const ORDER_STORE_KEY = "happyTailsOrders_v1";
 const LATEST_ORDER_KEY = "happyTailsLatestOrder_v1";
+const SESSION_STORAGE_KEY = "happyTailsSession_v2";
 
 const STATUS_STEPS_BY_TYPE = {
   Delivery: ["Pending", "Preparing", "Out for Delivery", "Delivered"],
-  "Dine-in": ["Pending", "Preparing", "Food is Ready", "Enjoy!"],
+  "Dine-in": ["Pending", "Preparing", "Food is Ready", "Completed"],
   Pickup: ["Pending", "Preparing", "Ready for Pickup", "Picked Up"],
   Takeout: ["Pending", "Preparing", "Ready for Takeout", "Picked Up"]
 };
+
+function getCustomerId() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    return session?.user?.id || "guest";
+  } catch {
+    return "guest";
+  }
+}
 
 function readOrders() {
   try {
@@ -20,9 +32,24 @@ function writeOrders(orders) {
   localStorage.setItem(ORDER_STORE_KEY, JSON.stringify(orders));
 }
 
+function cacheOrder(order) {
+  const orders = readOrders().filter((item) => item.id !== order.id);
+  orders.unshift(order);
+  writeOrders(orders);
+  localStorage.setItem(LATEST_ORDER_KEY, order.id);
+}
+
+function readCustomerOrders(customerId) {
+  return readOrders().filter((order) => order.customerId === customerId);
+}
+
 function makeOrderId() {
   const suffix = Math.floor(1000 + Math.random() * 9000);
   return `HT-${suffix}`;
+}
+
+function shouldFallbackToLocal(error) {
+  return isApiAvailableError(error) || (error instanceof ApiError && error.status >= 500);
 }
 
 export function getStatusSteps(orderType) {
@@ -59,8 +86,23 @@ export async function validateCheckout(orderPayload) {
   };
 }
 
+async function createLocalOrder(orderPayload) {
+  const now = new Date().toISOString();
+  const order = {
+    id: makeOrderId(),
+    customerId: orderPayload.customerId || getCustomerId(),
+    createdAt: now,
+    updatedAt: now,
+    status: "Pending",
+    statusTimeline: [{ status: "Pending", at: now }],
+    ...orderPayload
+  };
+
+  cacheOrder(order);
+  return order;
+}
+
 export async function createOrder(orderPayload) {
-  // TODO(API): Replace with POST /api/orders.
   const validation = await validateCheckout(orderPayload);
   if (!validation.isValid) {
     const error = new Error("Checkout validation failed.");
@@ -68,40 +110,75 @@ export async function createOrder(orderPayload) {
     throw error;
   }
 
-  const orders = readOrders();
-  const now = new Date().toISOString();
-  const order = {
-    id: makeOrderId(),
-    createdAt: now,
-    status: "Pending",
-    statusTimeline: [{ status: "Pending", at: now }],
-    ...orderPayload
-  };
+  const payload = { ...orderPayload, customerId: orderPayload.customerId || getCustomerId() };
 
-  orders.unshift(order);
-  writeOrders(orders);
-  localStorage.setItem(LATEST_ORDER_KEY, order.id);
-
-  return order;
+  try {
+    const response = await requestJson("/orders", {
+      method: "POST",
+      body: payload
+    });
+    cacheOrder(response.order);
+    return response.order;
+  } catch (error) {
+    if (!shouldFallbackToLocal(error)) throw error;
+    return createLocalOrder(payload);
+  }
 }
 
 export async function getLatestOrder() {
-  // TODO(API): Replace with GET /api/orders/:id for last order.
-  const latestId = localStorage.getItem(LATEST_ORDER_KEY);
-  if (!latestId) return null;
+  const customerId = getCustomerId();
 
-  const orders = readOrders();
-  return orders.find((order) => order.id === latestId) || null;
+  try {
+    const response = await requestJson(`/orders/latest?customerId=${encodeURIComponent(customerId)}`);
+    cacheOrder(response.order);
+    return response.order;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    if (!shouldFallbackToLocal(error)) throw error;
+
+    const latestId = localStorage.getItem(LATEST_ORDER_KEY);
+    if (!latestId) return null;
+
+    const orders = readCustomerOrders(customerId);
+    return orders.find((order) => order.id === latestId) || orders[0] || null;
+  }
 }
 
 export async function getOrderById(orderId) {
-  // TODO(API): Replace with GET /api/orders/:id.
   if (!orderId) return null;
-  const orders = readOrders();
-  return orders.find((order) => order.id === orderId) || null;
+
+  try {
+    const response = await requestJson(`/orders/${orderId}`);
+    cacheOrder(response.order);
+    return response.order;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    if (!shouldFallbackToLocal(error)) throw error;
+
+    const orders = readOrders();
+    return orders.find((order) => order.id === orderId) || null;
+  }
 }
 
 export async function getOrderHistory() {
-  // TODO(API): Replace with GET /api/orders/history.
-  return readOrders();
+  const customerId = getCustomerId();
+
+  try {
+    const response = await requestJson(`/orders?customerId=${encodeURIComponent(customerId)}`);
+    if (Array.isArray(response.orders)) {
+      const merged = [
+        ...response.orders,
+        ...readOrders().filter((order) => order.customerId !== customerId)
+      ];
+      writeOrders(merged);
+      if (response.orders[0]?.id) {
+        localStorage.setItem(LATEST_ORDER_KEY, response.orders[0].id);
+      }
+      return response.orders;
+    }
+    return [];
+  } catch (error) {
+    if (!shouldFallbackToLocal(error)) throw error;
+    return readCustomerOrders(customerId);
+  }
 }
