@@ -1,19 +1,6 @@
-import { requestJson } from "./api";
 import { getOrderHistory } from "./orderService";
 
 export async function getCustomerLoyaltyData(customerName = "") {
-  try {
-    const response = await requestJson("/loyalty/me");
-    if (response?.loyalty) {
-      return {
-        customerName,
-        ...response.loyalty
-      };
-    }
-  } catch {
-    // fallback below
-  }
-
   const orders = await getOrderHistory();
   const completed = orders.filter((order) => ["Delivered", "Completed", "Picked Up", "Enjoy!"].includes(order.status));
   const eligibleStamps = completed.filter((order) => /coffee|latte|frappe|americano/i.test(order.items?.map((item) => item.name).join(" "))).length;
