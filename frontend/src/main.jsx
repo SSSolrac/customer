@@ -4,11 +4,14 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 import { CartProvider } from "./context/CartContext";
+import { SessionProvider } from "./context/SessionContext";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <CartProvider>
-      <App />
-    </CartProvider>
+    <SessionProvider>
+      <CartProvider>
+        <App />
+      </CartProvider>
+    </SessionProvider>
   </BrowserRouter>
 );
