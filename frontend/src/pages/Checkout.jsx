@@ -1,61 +1,94 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import { createOrder, validateCheckout } from "../services/orderService";
+import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
+import "./Checkout.css";
+
+const defaultForm = {
+  name: "",
+  phone: "",
+  address: "",
+  orderType: "Dine-in",
+  payment: "Cash",
+  receiptName: "",
+  notes: ""
+};
 
 export default function Checkout() {
   const navigate = useNavigate();
   const { cart, total, clearCart } = useCart();
+  const [form, setForm] = useState(defaultForm);
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    orderType: "Dine-in",
-    payment: "Cash",
-    receipt: null,
-    notes: "",
-  });
-
-  // Load data on mount
   useEffect(() => {
-    const savedName = localStorage.getItem("customerName");
-    const savedPhone = localStorage.getItem("customerPhone");
-    if (savedName || savedPhone) {
-      setForm(prev => ({
+    const loadProfile = async () => {
+      const profile = await getCustomerProfile();
+      if (!profile) return;
+      setForm((prev) => ({
         ...prev,
-        name: savedName || "",
-        phone: savedPhone || ""
+        name: profile.fullName || "",
+        phone: profile.phone || "",
+        address: profile.address || ""
       }));
-    }
+    };
+
+    loadProfile();
   }, []);
 
-  const submit = (e) => {
-    e.preventDefault();
-    if (cart.length === 0) return;
+  const payload = useMemo(
+    () => ({
+      customer: {
+        name: form.name,
+        phone: form.phone,
+        address: form.address
+      },
+      orderType: form.orderType,
+      payment: form.payment,
+      receiptName: form.receiptName,
+      notes: form.notes,
+      items: cart,
+      total
+    }),
+    [cart, form, total]
+  );
 
-    // Save user info
-    localStorage.setItem("customerName", form.name);
-    localStorage.setItem("customerPhone", form.phone);
-
-    // Tracking logic
-    const generatedId = "HT-" + Math.floor(1000 + Math.random() * 9000);
-    localStorage.setItem("latestOrderType", form.orderType);
-    localStorage.setItem("latestOrderId", generatedId);
-    localStorage.setItem(`status_${generatedId}`, "Pending");
-
-    clearCart();
-    navigate("/order-success");
+  const handleFieldChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => ({ ...prev, [key]: "" }));
   };
 
-  const handleCancel = () => {
-    if (window.confirm("Cancel order and empty cart?")) {
+  const submit = async (event) => {
+    event.preventDefault();
+
+    const validation = await validateCheckout(payload);
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await saveCustomerProfile({
+        fullName: form.name,
+        phone: form.phone,
+        address: form.address
+      });
+
+      await createOrder(payload);
       clearCart();
-      navigate("/order");
+      navigate("/order-success");
+    } catch (error) {
+      setErrors({ form: error.message || "Could not place your order." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   if (cart.length === 0) {
     return (
-      <div style={{ padding: 24, textAlign: "center" }}>
+      <div className="checkout-state">
         <h1>Checkout</h1>
         <p>Your cart is empty.</p>
         <Link to="/order">Go to Order</Link>
@@ -64,94 +97,80 @@ export default function Checkout() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>Checkout</h1>
+    <div className="checkout-page">
+      <div className="checkout-header">
+        <h1>Checkout</h1>
         <Link to="/cart">← Back to Cart</Link>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-        <form onSubmit={submit} style={{ background: "white", padding: 16, borderRadius: 14 }}>
+      <div className="checkout-layout">
+        <form className="checkout-card" onSubmit={submit}>
           <h3>Customer Details</h3>
+
           <label>Name</label>
-          <input
-            required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 10 }}
-          />
+          <input value={form.name} onChange={(e) => handleFieldChange("name", e.target.value)} />
+          {errors.name ? <p className="field-error">{errors.name}</p> : null}
 
           <label>Phone</label>
-          <input
-            required
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 10 }}
-          />
+          <input value={form.phone} onChange={(e) => handleFieldChange("phone", e.target.value)} />
+          {errors.phone ? <p className="field-error">{errors.phone}</p> : null}
 
           <label>Order Type</label>
-          <select
-            value={form.orderType}
-            onChange={(e) => setForm({ ...form, orderType: e.target.value })}
-            style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 10 }}
-          >
+          <select value={form.orderType} onChange={(e) => handleFieldChange("orderType", e.target.value)}>
             <option value="Dine-in">Dine-in</option>
             <option value="Pickup">Pickup</option>
             <option value="Takeout">Takeout</option>
             <option value="Delivery">Delivery</option>
           </select>
 
+          {form.orderType === "Delivery" ? (
+            <>
+              <label>Delivery Address</label>
+              <input value={form.address} onChange={(e) => handleFieldChange("address", e.target.value)} />
+              {errors.address ? <p className="field-error">{errors.address}</p> : null}
+            </>
+          ) : null}
+
           <label>Payment</label>
-          <select
-            value={form.payment}
-            onChange={(e) => setForm({ ...form, payment: e.target.value })}
-            style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 10 }}
-          >
-            <option>Cash</option>
-            <option>Maya</option>
-            <option>GCash</option>
+          <select value={form.payment} onChange={(e) => handleFieldChange("payment", e.target.value)}>
+            <option value="Cash">Cash</option>
+            <option value="Maya">Maya</option>
+            <option value="GCash">GCash</option>
           </select>
 
           {(form.payment === "GCash" || form.payment === "Maya") && (
-            <div style={{ marginBottom: 10 }}>
-              <label>Upload Payment Receipt <span style={{color: "red"}}>*</span></label>
+            <>
+              <label>Receipt Upload</label>
               <input
                 type="file"
                 accept="image/*"
-                required 
-                onChange={(e) => setForm({ ...form, receipt: e.target.files[0] })}
-                style={{ width: "100%", padding: 10, marginTop: 6 }}
+                onChange={(e) => handleFieldChange("receiptName", e.target.files?.[0]?.name || "")}
               />
-            </div>
+              {errors.receipt ? <p className="field-error">{errors.receipt}</p> : null}
+            </>
           )}
 
           <label>Notes (optional)</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            style={{ width: "100%", padding: 10, marginTop: 6, minHeight: 90 }}
-          />
+          <textarea value={form.notes} onChange={(e) => handleFieldChange("notes", e.target.value)} />
 
-          <div style={{ display: "flex", gap: "10px", marginTop: 12 }}>
-            <button type="submit" style={{ flex: 1, fontWeight: 900, padding: "10px 14px", backgroundColor: "#36d7e8", border: "none", borderRadius: "5px", cursor: "pointer" }}>
-              Place Order
-            </button>
-            <button type="button" onClick={handleCancel} style={{ flex: 1, fontWeight: 900, padding: "10px 14px", backgroundColor: "#ff4d94", color: "white", border: "none", borderRadius: "5px", cursor: "pointer" }}>
-              Cancel
-            </button>
-          </div>
+          {errors.form ? <p className="field-error">{errors.form}</p> : null}
+          {errors.items ? <p className="field-error">{errors.items}</p> : null}
+
+          <button className="checkout-submit" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Placing order..." : "Place Order"}
+          </button>
         </form>
 
-        <div style={{ background: "white", padding: 16, borderRadius: 14 }}>
+        <div className="checkout-card">
           <h3>Order Summary</h3>
           {cart.map((item) => (
-            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+            <div className="summary-row" key={item.id}>
               <span>{item.name} × {item.qty}</span>
               <span>₱{item.price * item.qty}</span>
             </div>
           ))}
-          <hr style={{ margin: "14px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900 }}>
+          <hr />
+          <div className="summary-row total-row">
             <span>Total</span>
             <span>₱{total}</span>
           </div>
