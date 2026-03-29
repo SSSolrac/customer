@@ -39,10 +39,6 @@ function cacheOrder(order) {
   localStorage.setItem(LATEST_ORDER_KEY, order.id);
 }
 
-function readCustomerOrders(customerId) {
-  return readOrders().filter((order) => order.customerId === customerId);
-}
-
 function makeOrderId() {
   const suffix = Math.floor(1000 + Math.random() * 9000);
   return `HT-${suffix}`;
@@ -110,26 +106,22 @@ export async function createOrder(orderPayload) {
     throw error;
   }
 
-  const payload = { ...orderPayload, customerId: orderPayload.customerId || getCustomerId() };
-
   try {
     const response = await requestJson("/orders", {
       method: "POST",
-      body: payload
+      body: orderPayload
     });
     cacheOrder(response.order);
     return response.order;
   } catch (error) {
     if (!shouldFallbackToLocal(error)) throw error;
-    return createLocalOrder(payload);
+    return createLocalOrder(orderPayload);
   }
 }
 
 export async function getLatestOrder() {
-  const customerId = getCustomerId();
-
   try {
-    const response = await requestJson(`/orders/latest?customerId=${encodeURIComponent(customerId)}`);
+    const response = await requestJson("/orders/latest");
     cacheOrder(response.order);
     return response.order;
   } catch (error) {
@@ -139,8 +131,8 @@ export async function getLatestOrder() {
     const latestId = localStorage.getItem(LATEST_ORDER_KEY);
     if (!latestId) return null;
 
-    const orders = readCustomerOrders(customerId);
-    return orders.find((order) => order.id === latestId) || orders[0] || null;
+    const orders = readOrders();
+    return orders.find((order) => order.id === latestId) || null;
   }
 }
 
@@ -161,16 +153,10 @@ export async function getOrderById(orderId) {
 }
 
 export async function getOrderHistory() {
-  const customerId = getCustomerId();
-
   try {
-    const response = await requestJson(`/orders?customerId=${encodeURIComponent(customerId)}`);
+    const response = await requestJson("/orders");
     if (Array.isArray(response.orders)) {
-      const merged = [
-        ...response.orders,
-        ...readOrders().filter((order) => order.customerId !== customerId)
-      ];
-      writeOrders(merged);
+      writeOrders(response.orders);
       if (response.orders[0]?.id) {
         localStorage.setItem(LATEST_ORDER_KEY, response.orders[0].id);
       }
@@ -179,6 +165,6 @@ export async function getOrderHistory() {
     return [];
   } catch (error) {
     if (!shouldFallbackToLocal(error)) throw error;
-    return readCustomerOrders(customerId);
+    return readOrders();
   }
 }

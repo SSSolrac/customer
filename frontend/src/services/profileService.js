@@ -1,4 +1,4 @@
-import { ApiError, isApiAvailableError, requestJson } from "./api";
+import { isApiAvailableError, requestJson } from "./api";
 
 const PROFILE_STORAGE_KEY = "happyTailsProfile_v2";
 
@@ -17,13 +17,9 @@ export async function getCustomerProfile() {
       localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(response.profile));
       return response.profile;
     }
-    return null;
   } catch (error) {
-    if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 404) {
-      throw error;
-    }
-    if (!isApiAvailableError(error) && !(error instanceof ApiError)) {
-      throw error;
+    if (!isApiAvailableError(error)) {
+      // planned endpoint may not exist yet; keep fallback silent for now
     }
   }
 
@@ -38,11 +34,8 @@ export async function saveCustomerProfile(profile) {
       return response.profile;
     }
   } catch (error) {
-    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
-      throw error;
-    }
-    if (!isApiAvailableError(error) && !(error instanceof ApiError)) {
-      throw error;
+    if (!isApiAvailableError(error)) {
+      // fallback to local for demo/offline usage
     }
   }
 

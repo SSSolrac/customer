@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useOrderTracking } from "../hooks/useOrderTracking";
 import "./TrackOrder.css";
 
@@ -10,18 +10,11 @@ function formatTimestamp(value) {
 
 export default function TrackOrder() {
   const { order, isLoading, error, steps, currentStepIndex, loadLatest, lookupByOrderId } = useOrderTracking();
-  const [searchParams] = useSearchParams();
-  const [searchId, setSearchId] = useState(searchParams.get("orderId") || "");
+  const [searchId, setSearchId] = useState("");
 
   useEffect(() => {
-    const requestedOrderId = searchParams.get("orderId");
-    if (requestedOrderId) {
-      lookupByOrderId(requestedOrderId);
-      return;
-    }
-
     loadLatest();
-  }, [loadLatest, lookupByOrderId, searchParams]);
+  }, [loadLatest]);
 
   const activeTimeline = useMemo(() => {
     const timelineMap = new Map((order?.statusTimeline || []).map((entry) => [entry.status, entry.at]));

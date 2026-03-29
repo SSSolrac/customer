@@ -1,7 +1,6 @@
 import { MENU } from "../data/menuData";
-import { requestJson } from "./api";
 
-function deriveDailyPicksFallback() {
+function deriveDailyPicks() {
   const allItems = Object.values(MENU).flatMap((category) => category.items);
   const daySeed = new Date().getDate();
   const picks = allItems.filter((_, index) => (index + daySeed) % 5 === 0).slice(0, 6);
@@ -18,14 +17,7 @@ function deriveDailyPicksFallback() {
 }
 
 export async function getCurrentDailyMenu() {
-  try {
-    const response = await requestJson("/daily-menu/current");
-    if (response?.menu) return response.menu;
-  } catch {
-    // fallback below
-  }
-
-  const categories = deriveDailyPicksFallback();
+  const categories = deriveDailyPicks();
 
   return {
     title: "Menu of the Day",

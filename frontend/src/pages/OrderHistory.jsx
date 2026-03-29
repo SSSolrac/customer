@@ -74,7 +74,7 @@ export default function OrderHistory() {
                 <button type="button" className="ghost-btn" title="Coming soon">
                   Repeat order
                 </button>
-                <Link to={`/track-order?orderId=${encodeURIComponent(order.id)}`}>Track</Link>
+                <Link to={`/track-order`}>Track</Link>
               </div>
 
               {isExpanded ? (
