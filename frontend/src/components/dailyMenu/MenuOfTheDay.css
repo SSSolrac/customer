@@ -70,3 +70,5 @@
     margin-top: 24px;
   }
 }
+
+.daily-menu__header small { color:#8a6c79; display:block; margin-top:8px; }

@@ -1,19 +1,22 @@
-/**
- * Temporary loyalty data service for customer-facing pages.
- *
- * TODO (API integration): Replace this with a real API call, e.g.
- * GET /api/loyalty/me
- */
-export async function getCustomerLoyaltyData() {
-  // Simulate an async request so consumers can keep the same data flow once backend is connected.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        customerName: "Jamie",
-        stampCount: 5,
-        stampsRequired: 8,
-        rewardAvailable: false
-      });
-    }, 250);
-  });
+import { getOrderHistory } from "./orderService";
+
+export async function getCustomerLoyaltyData(customerName = "") {
+  const orders = await getOrderHistory();
+  const completed = orders.filter((order) => ["Delivered", "Completed", "Picked Up", "Enjoy!"].includes(order.status));
+  const eligibleStamps = completed.filter((order) => /coffee|latte|frappe|americano/i.test(order.items?.map((item) => item.name).join(" "))).length;
+  const stampsRequired = 8;
+  const stampCount = eligibleStamps % stampsRequired;
+
+  return {
+    customerName,
+    stampCount,
+    stampsRequired,
+    rewardAvailable: eligibleStamps > 0 && eligibleStamps % stampsRequired === 0,
+    totalEligibleOrders: eligibleStamps,
+    recentActivity: completed.slice(0, 3).map((order) => ({
+      id: order.id,
+      earnedAt: order.updatedAt || order.createdAt,
+      points: /coffee|latte|frappe|americano/i.test(order.items?.map((item) => item.name).join(" ")) ? 1 : 0
+    }))
+  };
 }
