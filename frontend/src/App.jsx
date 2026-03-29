@@ -1,5 +1,4 @@
-// src/App.jsx
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import Navbar from "./components/Navbar";
@@ -12,30 +11,27 @@ import About from "./pages/About";
 import Order from "./pages/Order";
 import OrderCategory from "./pages/OrderCategory";
 import Profile from "./pages/Profile";
+import OrderHistory from "./pages/OrderHistory";
 
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
-// ✅ CRITICAL: Make sure this file exists in src/pages/TrackOrder.jsx
-import TrackOrder from "./pages/TrackOrder"; 
-
+import TrackOrder from "./pages/TrackOrder";
 import pattern from "./assets/pattern.png";
+import { useSession } from "./context/SessionContext";
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useSession();
+  return isAuthenticated ? children : <Navigate to="/" replace />;
+}
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
+  const { isAuthenticated, isGuest, signIn, continueAsGuest, signOut } = useSession();
   const [showModal, setShowModal] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ Restore login state if saved
-  useEffect(() => {
-    const savedAuth = localStorage.getItem("isAuthenticated");
-    if (savedAuth === "true") setIsAuthenticated(true);
-  }, []);
-
-  // ✅ Background on all pages EXCEPT landing page "/"
   useEffect(() => {
     const isLanding = location.pathname === "/";
 
@@ -56,24 +52,14 @@ function App() {
   }, [location.pathname]);
 
   const handleLogin = () => {
-    setIsAuthenticated(true);
-    setIsGuest(false);
-    localStorage.setItem("isAuthenticated", "true");
+    signIn();
     setShowModal(false);
   };
 
   const handleGuest = () => {
-    setIsGuest(true);
-    setIsAuthenticated(false);
+    continueAsGuest();
     setShowModal(false);
     navigate("/order");
-  };
-
-  const handleSignOut = () => {
-    setIsAuthenticated(false);
-    setIsGuest(false);
-    localStorage.removeItem("isAuthenticated");
-    navigate("/");
   };
 
   const handleOrderClick = () => {
@@ -83,28 +69,21 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Navbar
-        isAuthenticated={isAuthenticated}
-        onSignOut={handleSignOut}
-        onOpenModal={() => setShowModal(true)}
-      />
+      <Navbar onSignOut={signOut} onOpenModal={() => setShowModal(true)} />
 
       <main className="app-main">
         <Routes>
           <Route path="/" element={<Home onOrderClick={handleOrderClick} />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/about" element={<About />} />
-
           <Route path="/order" element={<Order />} />
           <Route path="/order/:category" element={<OrderCategory />} />
           <Route path="/order-success" element={<OrderSuccess />} />
-
-          {/* ✅ TRACK ORDER ROUTE ADDED HERE */}
           <Route path="/track-order" element={<TrackOrder />} />
-
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/order-history" element={<ProtectedRoute><OrderHistory /></ProtectedRoute>} />
         </Routes>
       </main>
 
