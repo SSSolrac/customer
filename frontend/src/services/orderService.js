@@ -2,6 +2,7 @@ import { ApiError, isApiAvailableError, requestJson } from "./api";
 
 const ORDER_STORE_KEY = "happyTailsOrders_v1";
 const LATEST_ORDER_KEY = "happyTailsLatestOrder_v1";
+const SESSION_STORAGE_KEY = "happyTailsSession_v2";
 
 const STATUS_STEPS_BY_TYPE = {
   Delivery: ["Pending", "Preparing", "Out for Delivery", "Delivered"],
@@ -9,6 +10,15 @@ const STATUS_STEPS_BY_TYPE = {
   Pickup: ["Pending", "Preparing", "Ready for Pickup", "Picked Up"],
   Takeout: ["Pending", "Preparing", "Ready for Takeout", "Picked Up"]
 };
+
+function getCustomerId() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    return session?.user?.id || "guest";
+  } catch {
+    return "guest";
+  }
+}
 
 function readOrders() {
   try {
@@ -76,6 +86,7 @@ async function createLocalOrder(orderPayload) {
   const now = new Date().toISOString();
   const order = {
     id: makeOrderId(),
+    customerId: orderPayload.customerId || getCustomerId(),
     createdAt: now,
     updatedAt: now,
     status: "Pending",
