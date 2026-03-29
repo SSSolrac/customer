@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import LoyaltyCard from "../components/loyalty/LoyaltyCard";
+import { getCustomerLoyaltyData } from "../services/loyaltyService";
 import "./Profile.css";
 
 function Profile() {
@@ -10,12 +12,23 @@ function Profile() {
     city: "",
     notes: ""
   });
+  const [loyaltyData, setLoyaltyData] = useState(null);
 
   useEffect(() => {
     const savedData = localStorage.getItem("userProfile");
     if (savedData) {
       setFormData(JSON.parse(savedData));
     }
+  }, []);
+
+  useEffect(() => {
+    const loadLoyaltyData = async () => {
+      // TODO (API integration): replace mock service with GET /api/loyalty/me.
+      const data = await getCustomerLoyaltyData();
+      setLoyaltyData(data);
+    };
+
+    loadLoyaltyData();
   }, []);
 
   const handleChange = (e) => {
@@ -34,6 +47,12 @@ function Profile() {
   return (
     <div className="profile-page">
       <h1>My Profile</h1>
+
+      {loyaltyData ? (
+        <LoyaltyCard loyaltyData={loyaltyData} />
+      ) : (
+        <p className="loyalty-loading">Loading your loyalty card...</p>
+      )}
 
       <form className="profile-form" onSubmit={handleSave}>
         <input

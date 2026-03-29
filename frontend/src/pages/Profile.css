@@ -1,41 +1,51 @@
 .profile-page {
-    padding: 140px 20px 60px;
-    text-align: center;
-    font-family: "Poppins", sans-serif;
-  }
-  
-  .profile-page h1 {
-    margin-bottom: 40px;
-    color: #ff6fa5;
-  }
-  
-  .profile-form {
-    max-width: 500px;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  .profile-form input,
-  .profile-form textarea {
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
-    font-size: 14px;
-  }
-  
-  .profile-form textarea {
-    min-height: 80px;
-    resize: none;
-  }
-  
-  .save-btn {
-    padding: 12px;
-    border: none;
-    border-radius: 25px;
-    background: #ff6fa5;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-  }
+  padding: 140px 20px 60px;
+  text-align: center;
+  font-family: "Poppins", sans-serif;
+}
+
+.profile-page h1 {
+  margin-bottom: 24px;
+  color: #ff6fa5;
+}
+
+.loyalty-loading {
+  max-width: 560px;
+  margin: 0 auto 24px;
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #f5c7da;
+  color: #7f5d6b;
+}
+
+.profile-form {
+  max-width: 500px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.profile-form input,
+.profile-form textarea {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.profile-form textarea {
+  min-height: 80px;
+  resize: none;
+}
+
+.save-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 25px;
+  background: #ff6fa5;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
