@@ -1,5 +1,5 @@
 export const CANONICAL_ORDER_STATUSES = ["pending", "preparing", "ready", "out_for_delivery", "completed", "delivered", "cancelled", "refunded"];
-export const CANONICAL_PAYMENT_METHODS = ["cash", "card", "e_wallet"];
+export const CANONICAL_PAYMENT_METHODS = ["cash", "e_wallet"];
 export const CANONICAL_PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 export const CANONICAL_ORDER_TYPES = ["dine_in", "pickup", "takeout", "delivery"];
 
@@ -16,7 +16,6 @@ export const STATUS_LABELS = {
 
 export const PAYMENT_METHOD_LABELS = {
   cash: "Cash",
-  card: "Card",
   e_wallet: "E-Wallet"
 };
 
@@ -42,7 +41,6 @@ export function canonicalOrderTypeToLabel(type) {
 export function labelToCanonicalPaymentMethod(value) {
   const key = String(value || "").trim().toLowerCase();
   if (["maya", "gcash", "e-wallet", "e_wallet"].includes(key)) return "e_wallet";
-  if (key === "card") return "card";
   return "cash";
 }
 
