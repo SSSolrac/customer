@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOrderTracking } from "../hooks/useOrderTracking";
+import { getStatusLabel } from "../services/orderService";
 import "./TrackOrder.css";
 
 function formatTimestamp(value) {
@@ -43,7 +44,7 @@ export default function TrackOrder() {
           type="text"
           value={searchId}
           onChange={(event) => setSearchId(event.target.value.toUpperCase())}
-          placeholder="Enter order ID (e.g., HT-4821)"
+          placeholder="Enter order ID (e.g., ORD-20260101-101)"
           aria-label="Order ID"
         />
         <button type="submit" disabled={isLoading}>Find Order</button>
@@ -65,15 +66,15 @@ export default function TrackOrder() {
         <>
           <div className="track-order-card">
             <div className="track-order-row">
-              <h2>{order.status}</h2>
-              <span className="track-pill">{order.orderType}</span>
+              <h2>{order.statusLabel || getStatusLabel(order.status)}</h2>
+              <span className="track-pill">{order.orderTypeLabel}</span>
             </div>
-            <p><strong>Order ID:</strong> {order.id}</p>
+            <p><strong>Order ID:</strong> {order.orderNumber || order.id}</p>
             <p><strong>Placed:</strong> {formatTimestamp(order.createdAt)}</p>
             <p><strong>Last update:</strong> {formatTimestamp(order.updatedAt)}</p>
-            <p><strong>Payment:</strong> {order.payment}</p>
+            <p><strong>Payment:</strong> {order.paymentMethodLabel}</p>
             <p><strong>Total:</strong> ₱{Number(order.total || 0).toFixed(2)}</p>
-            <p><strong>Items:</strong> {order.items?.map((item) => `${item.name} × ${item.qty}`).join(", ")}</p>
+            <p><strong>Items:</strong> {order.items?.map((item) => `${item.itemName} × ${item.qty}`).join(", ")}</p>
           </div>
 
           <div className="track-timeline">
@@ -83,7 +84,7 @@ export default function TrackOrder() {
                   {state === "complete" ? "✓" : ""}
                 </div>
                 <div>
-                  <p className={state !== "upcoming" ? "active" : ""}>{step}</p>
+                  <p className={state !== "upcoming" ? "active" : ""}>{getStatusLabel(step)}</p>
                   <small>{at ? `Updated ${formatTimestamp(at)}` : "Awaiting this stage"}</small>
                 </div>
               </div>

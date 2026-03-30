@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getOrderHistory } from "../services/orderService";
+import { getOrderHistory, getStatusLabel } from "../services/orderService";
 import "./OrderHistory.css";
 
 function formatMoney(value) {
@@ -58,17 +58,17 @@ export default function OrderHistory() {
           return (
             <article key={order.id} className="history-card">
               <div className="history-row">
-                <h3>{order.id}</h3>
-                <span className="status-pill">{order.status}</span>
+                <h3>{order.orderNumber || order.id}</h3>
+                <span className="status-pill">{getStatusLabel(order.status)}</span>
               </div>
 
               <p>Placed: {formatDateTime(order.createdAt)}</p>
               <p>
-                {order.orderType} • {order.payment} • {order.items.length} items • <strong>{formatMoney(order.total)}</strong>
+                {order.orderTypeLabel} • {order.paymentMethodLabel} • {order.items.length} items • <strong>{formatMoney(order.total)}</strong>
               </p>
 
               <p className="history-items-summary">
-                {order.items.slice(0, 2).map((item) => `${item.name} × ${item.qty}`).join(", ")}
+                {order.items.slice(0, 2).map((item) => `${item.itemName} × ${item.qty}`).join(", ")}
                 {order.items.length > 2 ? ` +${order.items.length - 2} more` : ""}
               </p>
 
@@ -82,7 +82,7 @@ export default function OrderHistory() {
               {isExpanded ? (
                 <ul>
                   {order.items.map((item) => (
-                    <li key={item.id}>{item.name} × {item.qty} — {formatMoney(item.price * item.qty)}</li>
+                    <li key={item.id}>{item.itemName} × {item.qty} — {formatMoney(item.unitPrice * item.qty)}</li>
                   ))}
                 </ul>
               ) : null}
