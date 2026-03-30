@@ -145,6 +145,7 @@ export default function Checkout() {
           <label>Payment</label>
           <select value={form.paymentMethod} onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}>
             <option value="Cash">Cash</option>
+            <option value="Card">Card</option>
             <option value="Maya">Maya</option>
             <option value="GCash">GCash</option>
           </select>
