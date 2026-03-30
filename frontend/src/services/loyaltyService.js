@@ -1,35 +1,37 @@
-import { ApiError, requestJson } from "./api";
+import { requestJson } from "./api";
 import { getSessionCustomerId } from "./sessionService";
+import { getOrderHistory } from "./orderService";
+
+const COMPLETED_STATUSES = new Set(["Delivered", "Completed", "Picked Up", "Enjoy!"]);
+
+// Centralized constants keep this service ready for backend-driven loyalty rules.
+const LOYALTY_MILESTONES = [
+  { stamp: 6, reward: "Free Latte" },
+  { stamp: 10, reward: "Free Groom" }
+];
+const TOTAL_STAMPS = 10;
 
 export async function getCustomerLoyaltyData(customerName = "") {
   const customerId = getSessionCustomerId();
 
-  try {
-    const response = await requestJson(`/loyalty/${encodeURIComponent(customerId)}`);
-    const loyalty = response?.loyalty;
+  // Loyalty rule: earn 1 stamp per completed order.
+  const currentStampCount = Math.min(completedOrders.length, TOTAL_STAMPS);
+  const unlockedRewards = LOYALTY_MILESTONES.filter(({ stamp }) => currentStampCount >= stamp).map((milestone) => milestone.reward);
 
-    if (!loyalty) {
-      throw new Error("Loyalty account not found.");
-    }
-
-    return {
-      customerName,
-      totalStamps: 10,
-      currentStampCount: loyalty.currentStampCount || 0,
-      totalStampsEarned: loyalty.totalStampsEarned || 0,
-      rewardMilestones: [
-        { stamp: 6, reward: "Free Latte" },
-        { stamp: 10, reward: "Free Groom" }
-      ],
-      rewardsUnlocked: loyalty.rewardsUnlocked || [],
-      lastStampedOrderId: loyalty.lastStampedOrderId || null,
-      updatedAt: loyalty.updatedAt || null,
-      recentActivity: []
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw new Error(error.data?.error || "Unable to load loyalty rewards right now.");
-    }
-    throw new Error("Unable to load loyalty rewards right now.");
-  }
+  return {
+    customerName,
+    totalStamps: TOTAL_STAMPS,
+    currentStampCount,
+    rewardMilestones: LOYALTY_MILESTONES,
+    rewardsUnlocked: unlockedRewards,
+    totalCompletedOrders: completedOrders.length,
+    // Placeholder structure for future API-provided loyalty activity feed.
+    recentActivity: completedOrders.slice(0, 3).map((order) => ({
+      id: order.id,
+      earnedAt: order.updatedAt || order.createdAt,
+      status: order.status,
+      stampDelta: 1,
+      type: "completed-order"
+    }))
+  };
 }
