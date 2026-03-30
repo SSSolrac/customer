@@ -1,15 +1,42 @@
 import { ApiError, isApiAvailableError, requestJson } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
 
-const ORDER_STORE_KEY = "happyTailsOrders_v2";
-const LATEST_ORDER_KEY = "happyTailsLatestOrder_v2";
+const ORDER_STORE_KEY = "happyTailsOrders_v3";
+const LATEST_ORDER_KEY = "happyTailsLatestOrder_v3";
 
-const STATUS_STEPS_BY_TYPE = {
-  Delivery: ["Pending", "Preparing", "Out for Delivery", "Delivered"],
-  "Dine-in": ["Pending", "Preparing", "Food is Ready", "Completed"],
-  Pickup: ["Pending", "Preparing", "Ready for Pickup", "Picked Up"],
-  Takeout: ["Pending", "Preparing", "Ready for Takeout", "Picked Up"]
+const STATUS_LABELS = {
+  pending: "Pending",
+  preparing: "Preparing",
+  ready: "Ready",
+  out_for_delivery: "Out for Delivery",
+  completed: "Completed",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  refunded: "Refunded"
 };
+
+const STATUS_STEPS_BY_ORDER_TYPE = {
+  delivery: ["pending", "preparing", "ready", "out_for_delivery", "delivered"],
+  dine_in: ["pending", "preparing", "ready", "completed"],
+  pickup: ["pending", "preparing", "ready", "completed"],
+  takeout: ["pending", "preparing", "ready", "completed"]
+};
+
+const ORDER_TYPE_LABELS = {
+  dine_in: "Dine-in",
+  pickup: "Pickup",
+  takeout: "Takeout",
+  delivery: "Delivery"
+};
+
+function toCanonicalOrderType(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (["dine-in", "dine_in", "dinein"].includes(key)) return "dine_in";
+  if (["pickup"].includes(key)) return "pickup";
+  if (["takeout"].includes(key)) return "takeout";
+  if (["delivery"].includes(key)) return "delivery";
+  return "takeout";
+}
 
 function getCustomerScopedKeys(customerId = getSessionCustomerId()) {
   return {
@@ -32,20 +59,6 @@ function writeOrders(orders, customerId = getSessionCustomerId()) {
   localStorage.setItem(ordersKey, JSON.stringify(orders));
 }
 
-function cacheOrder(order, customerId = order?.customerId || getSessionCustomerId()) {
-  const orders = readOrders(customerId).filter((item) => item.id !== order.id);
-  orders.unshift(order);
-  writeOrders(orders, customerId);
-
-  const { latestKey } = getCustomerScopedKeys(customerId);
-  localStorage.setItem(latestKey, order.id);
-}
-
-function makeOrderId() {
-  const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `HT-${suffix}`;
-}
-
 function shouldFallbackToLocal(error) {
   return isApiAvailableError(error) || (error instanceof ApiError && error.status >= 500);
 }
@@ -54,106 +67,100 @@ function toMs(value) {
   return new Date(value).getTime() || 0;
 }
 
-function withTimeline(order) {
+function normalizeOrder(order) {
   if (!order) return null;
 
-  const customerId = order.customerId || getSessionCustomerId();
-  const createdAt = order.createdAt || order.updatedAt || new Date().toISOString();
-  const steps = getStatusSteps(order.orderType);
-  const currentIndex = Math.max(steps.findIndex((step) => step.toLowerCase() === order.status?.toLowerCase()), 0);
+  const orderType = toCanonicalOrderType(order.orderType);
+  const status = String(order.status || "pending").toLowerCase();
+  const items = Array.isArray(order.items)
+    ? order.items.map((item, index) => ({
+      id: item.id || `line-${index + 1}`,
+      itemName: item.itemName || item.name || "Item",
+      qty: Number(item.qty || 1),
+      unitPrice: Number(item.unitPrice || item.price || 0)
+    }))
+    : [];
 
-  const existingTimeline = Array.isArray(order.statusTimeline) ? order.statusTimeline : [];
-  const timelineByStatus = new Map(existingTimeline.map((entry) => [entry.status, entry.at]));
-
-  let pointer = toMs(createdAt);
-  const fallbackTimeline = steps.slice(0, currentIndex + 1).map((step, index) => {
-    const proposed = timelineByStatus.get(step);
-    if (proposed) {
-      pointer = Math.max(pointer, toMs(proposed));
-      return { status: step, at: new Date(pointer).toISOString() };
-    }
-
-    if (index === 0) return { status: step, at: createdAt };
-
-    pointer += 4 * 60 * 1000;
-    return { status: step, at: new Date(pointer).toISOString() };
-  });
-
-  const normalizedTimeline = [...existingTimeline, ...fallbackTimeline]
-    .filter((entry) => entry?.status)
-    .sort((a, b) => toMs(a.at) - toMs(b.at))
-    .reduce((acc, entry) => {
-      if (!acc.some((saved) => saved.status === entry.status)) {
-        acc.push({ status: entry.status, at: entry.at || createdAt });
-      }
-      return acc;
-    }, []);
+  const timeline = Array.isArray(order.statusTimeline)
+    ? order.statusTimeline.map((entry) => ({ status: String(entry.status || "").toLowerCase(), at: entry.at }))
+    : [];
 
   return {
     ...order,
-    customerId,
-    createdAt,
-    updatedAt: order.updatedAt || normalizedTimeline.at(-1)?.at || createdAt,
-    statusTimeline: normalizedTimeline
+    orderNumber: order.orderNumber || order.id,
+    orderType,
+    orderTypeLabel: ORDER_TYPE_LABELS[orderType] || "Takeout",
+    status,
+    statusLabel: STATUS_LABELS[status] || "Pending",
+    paymentMethod: order.paymentMethod || "cash",
+    paymentMethodLabel: order.paymentMethod === "e_wallet" ? "E-Wallet" : String(order.paymentMethod || "cash").toUpperCase(),
+    items,
+    statusTimeline: timeline,
+    total: Number(order.total || 0)
   };
 }
 
-function normalizeAndFilterOrders(orders, customerId = getSessionCustomerId()) {
-  return orders
-    .map(withTimeline)
-    .filter((order) => order?.customerId === customerId)
-    .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
+function cacheOrder(order, customerId = order?.customerId || getSessionCustomerId()) {
+  const orders = readOrders(customerId).filter((item) => item.id !== order.id);
+  orders.unshift(order);
+  writeOrders(orders, customerId);
+  const { latestKey } = getCustomerScopedKeys(customerId);
+  localStorage.setItem(latestKey, order.id);
+}
+
+function getOrderQuery(customerId = getSessionCustomerId()) {
+  return `?customerId=${encodeURIComponent(customerId)}`;
 }
 
 export function getStatusSteps(orderType) {
-  return STATUS_STEPS_BY_TYPE[orderType] || ["Pending", "Preparing", "Processing", "Completed"];
+  return STATUS_STEPS_BY_ORDER_TYPE[toCanonicalOrderType(orderType)] || STATUS_STEPS_BY_ORDER_TYPE.takeout;
+}
+
+export function getStatusLabel(status) {
+  return STATUS_LABELS[String(status || "").toLowerCase()] || "Pending";
 }
 
 export async function validateCheckout(orderPayload) {
   const errors = {};
 
-  if (!orderPayload.items?.length) {
-    errors.items = "Your cart is empty.";
-  }
-
-  if (!orderPayload.customer?.name?.trim()) {
-    errors.name = "Name is required.";
-  }
-
-  if (!orderPayload.customer?.phone?.trim()) {
-    errors.phone = "Phone number is required.";
-  }
-
-  if (orderPayload.orderType === "Delivery" && !orderPayload.customer?.address?.trim()) {
+  if (!orderPayload.items?.length) errors.items = "Your cart is empty.";
+  if (!orderPayload.customer?.name?.trim()) errors.name = "Name is required.";
+  if (!orderPayload.customer?.phone?.trim()) errors.phone = "Phone number is required.";
+  if (toCanonicalOrderType(orderPayload.orderType) === "delivery" && !orderPayload.customer?.address?.trim()) {
     errors.address = "Delivery address is required for delivery orders.";
   }
 
-  const requiresReceipt = ["GCash", "Maya"].includes(orderPayload.payment);
-  if (requiresReceipt && !orderPayload.receiptName) {
+  const payment = String(orderPayload.payment || "").toLowerCase();
+  if (["maya", "gcash"].includes(payment) && !orderPayload.receiptName) {
     errors.receipt = "Receipt upload is required for wallet payments.";
   }
 
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
+  return { isValid: Object.keys(errors).length === 0, errors };
 }
 
-async function createLocalOrder(orderPayload) {
-  const now = new Date().toISOString();
-  const customerId = orderPayload.customerId || getSessionCustomerId();
-  const order = withTimeline({
-    id: makeOrderId(),
-    customerId,
-    createdAt: now,
-    updatedAt: now,
-    status: "Pending",
-    statusTimeline: [{ status: "Pending", at: now }],
-    ...orderPayload
-  });
-
-  cacheOrder(order, customerId);
-  return order;
+function toCanonicalCreatePayload(orderPayload) {
+  return {
+    customerId: orderPayload.customerId || getSessionCustomerId(),
+    customerName: orderPayload.customer?.name || "",
+    customerEmail: orderPayload.customer?.email || "",
+    customerPhone: orderPayload.customer?.phone || "",
+    customerAddress: orderPayload.customer?.address || "",
+    orderType: toCanonicalOrderType(orderPayload.orderType),
+    paymentMethod: ["maya", "gcash"].includes(String(orderPayload.payment || "").toLowerCase()) ? "e_wallet" : String(orderPayload.payment || "cash").toLowerCase(),
+    paymentStatus: "pending",
+    serviceFee: 0,
+    discount: 0,
+    subtotal: Number(orderPayload.total || 0),
+    total: Number(orderPayload.total || 0),
+    notes: orderPayload.notes || "",
+    receiptImageUrl: orderPayload.receiptName || "",
+    items: (orderPayload.items || []).map((item) => ({
+      id: item.id,
+      itemName: item.name,
+      qty: item.qty,
+      unitPrice: item.price
+    }))
+  };
 }
 
 export async function createOrder(orderPayload) {
@@ -164,59 +171,48 @@ export async function createOrder(orderPayload) {
     throw error;
   }
 
-  try {
-    const response = await requestJson("/orders", {
-      method: "POST",
-      body: orderPayload
-    });
-    const order = withTimeline(response.order);
-    cacheOrder(order, order.customerId);
-    return order;
-  } catch (error) {
-    if (!shouldFallbackToLocal(error)) throw error;
-    return createLocalOrder(orderPayload);
-  }
+  const response = await requestJson("/orders", {
+    method: "POST",
+    body: toCanonicalCreatePayload(orderPayload)
+  });
+  const order = normalizeOrder(response.order);
+  cacheOrder(order, order.customerId);
+  return order;
 }
 
 export async function getLatestOrder() {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson("/orders/latest");
-    const order = withTimeline(response.order);
-    if (!order || order.customerId !== customerId) return null;
+    const response = await requestJson(`/orders/latest${getOrderQuery(customerId)}`);
+    const order = normalizeOrder(response.order);
+    if (!order) return null;
     cacheOrder(order, customerId);
     return order;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (!shouldFallbackToLocal(error)) throw error;
-
     const { latestKey } = getCustomerScopedKeys(customerId);
     const latestId = localStorage.getItem(latestKey);
     if (!latestId) return null;
-
-    const orders = readOrders(customerId).map(withTimeline);
-    return orders.find((order) => order.id === latestId) || null;
+    return readOrders(customerId).find((entry) => entry.id === latestId) || null;
   }
 }
 
 export async function getOrderById(orderId) {
   if (!orderId) return null;
-
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson(`/orders/${orderId}`);
-    const order = withTimeline(response.order);
-    if (!order || order.customerId !== customerId) return null;
+    const response = await requestJson(`/orders/${encodeURIComponent(orderId)}${getOrderQuery(customerId)}`);
+    const order = normalizeOrder(response.order);
+    if (!order) return null;
     cacheOrder(order, customerId);
     return order;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (!shouldFallbackToLocal(error)) throw error;
-
-    const orders = readOrders(customerId).map(withTimeline);
-    return orders.find((order) => order.id === orderId) || null;
+    return readOrders(customerId).find((entry) => entry.id === orderId || entry.orderNumber === orderId) || null;
   }
 }
 
@@ -224,19 +220,19 @@ export async function getOrderHistory() {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson("/orders");
-    if (Array.isArray(response.orders)) {
-      const normalized = normalizeAndFilterOrders(response.orders, customerId);
-      writeOrders(normalized, customerId);
-      if (normalized[0]?.id) {
-        const { latestKey } = getCustomerScopedKeys(customerId);
-        localStorage.setItem(latestKey, normalized[0].id);
-      }
-      return normalized;
-    }
-    return [];
+    const response = await requestJson(`/orders${getOrderQuery(customerId)}`);
+    const normalized = Array.isArray(response.orders) ? response.orders.map(normalizeOrder).sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt)) : [];
+    writeOrders(normalized, customerId);
+    return normalized;
   } catch (error) {
     if (!shouldFallbackToLocal(error)) throw error;
-    return readOrders(customerId).map(withTimeline);
+    return readOrders(customerId);
   }
+}
+
+export async function getOrderStatusHistory(orderId) {
+  if (!orderId) return [];
+  const customerId = getSessionCustomerId();
+  const response = await requestJson(`/orders/${encodeURIComponent(orderId)}/history${getOrderQuery(customerId)}`);
+  return Array.isArray(response.history) ? response.history.map((entry) => ({ ...entry, status: String(entry.status || "").toLowerCase() })) : [];
 }

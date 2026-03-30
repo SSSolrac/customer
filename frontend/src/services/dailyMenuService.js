@@ -1,6 +1,7 @@
+import { requestJson } from "./api";
 import { MENU } from "../data/menuData";
 
-function deriveDailyPicks() {
+function deriveDailyPicksFallback() {
   const allItems = Object.values(MENU).flatMap((category) => category.items);
   const daySeed = new Date().getDate();
   const picks = allItems.filter((_, index) => (index + daySeed) % 5 === 0).slice(0, 6);
@@ -17,13 +18,21 @@ function deriveDailyPicks() {
 }
 
 export async function getCurrentDailyMenu() {
-  const categories = deriveDailyPicks();
+  try {
+    return await requestJson("/menu/daily");
+  } catch {
+    const categories = deriveDailyPicksFallback();
+    return {
+      title: "Menu of the Day",
+      subtitle: categories.length ? "Fresh picks selected by our kitchen" : "Chef picks are being prepared",
+      date: new Date().toISOString().split("T")[0],
+      isActive: categories.length > 0,
+      categories
+    };
+  }
+}
 
-  return {
-    title: "Menu of the Day",
-    subtitle: categories.length ? "Fresh picks selected by our kitchen" : "Chef picks are being prepared",
-    date: new Date().toISOString().split("T")[0],
-    isActive: categories.length > 0,
-    categories
-  };
+export async function getMenuCatalog() {
+  const response = await requestJson("/menu");
+  return Array.isArray(response.items) ? response.items : [];
 }

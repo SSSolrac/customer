@@ -1,35 +1,50 @@
+import { requestJson } from "./api";
+import { getSessionCustomerId } from "./sessionService";
 import { getOrderHistory } from "./orderService";
 
-const COMPLETED_STATUSES = new Set(["Delivered", "Completed", "Picked Up", "Enjoy!"]);
-const COFFEE_PATTERN = /coffee|latte|frappe|americano|matcha|choco/i;
+const LOYALTY_MILESTONES = [
+  { stamp: 6, reward: "Free Latte" },
+  { stamp: 10, reward: "Free Groom" }
+];
 
 export async function getCustomerLoyaltyData(customerName = "") {
+  const customerId = getSessionCustomerId();
+
+  try {
+    const response = await requestJson(`/loyalty/${encodeURIComponent(customerId)}`);
+    const loyalty = response?.loyalty;
+    if (loyalty) {
+      return {
+        customerName,
+        totalStamps: loyalty.totalStamps || 10,
+        currentStampCount: loyalty.currentStampCount || 0,
+        totalStampsEarned: loyalty.totalStampsEarned || 0,
+        rewardMilestones: loyalty.rewardMilestones || LOYALTY_MILESTONES,
+        rewardsUnlocked: loyalty.rewardsUnlocked || [],
+        recentActivity: loyalty.recentActivity || []
+      };
+    }
+  } catch {
+    // Fallback for offline/demo mode.
+  }
+
   const orders = await getOrderHistory();
-  const completedOrders = orders.filter((order) => COMPLETED_STATUSES.has(order.status));
-
-  const eligibleOrders = completedOrders.filter((order) =>
-    COFFEE_PATTERN.test(order.items?.map((item) => item.name).join(" "))
-  );
-
-  const stampsRequired = 8;
-  const totalEligibleOrders = eligibleOrders.length;
-  const rewardsRedeemable = Math.floor(totalEligibleOrders / stampsRequired);
-  const stampCount = totalEligibleOrders % stampsRequired;
+  const completedOrders = orders.filter((order) => ["completed", "delivered"].includes(order.status));
+  const totalStampsEarned = completedOrders.length;
 
   return {
     customerName,
-    stampCount,
-    stampsRequired,
-    rewardAvailable: rewardsRedeemable > 0,
-    rewardsRedeemable,
-    totalEligibleOrders,
-    completedOrdersCount: completedOrders.length,
-    progressMessage: `${stampCount} of ${stampsRequired} coffee stamps in your current reward cycle.`,
-    recentActivity: eligibleOrders.slice(0, 3).map((order) => ({
+    totalStamps: 10,
+    currentStampCount: Math.min(totalStampsEarned, 10),
+    totalStampsEarned,
+    rewardMilestones: LOYALTY_MILESTONES,
+    rewardsUnlocked: LOYALTY_MILESTONES.filter(({ stamp }) => totalStampsEarned >= stamp).map(({ reward }) => reward),
+    recentActivity: completedOrders.slice(0, 3).map((order) => ({
       id: order.id,
       earnedAt: order.updatedAt || order.createdAt,
-      points: 1,
-      status: order.status
+      status: order.status,
+      stampDelta: 1,
+      type: "completed-order"
     }))
   };
 }
