@@ -23,7 +23,6 @@ const STATUS_MAP = {
 
 const PAYMENT_MAP = {
   cash: "cash",
-  card: "card",
   maya: "e_wallet",
   gcash: "e_wallet",
   e_wallet: "e_wallet",
