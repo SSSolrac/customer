@@ -1,7 +1,7 @@
 import { isApiAvailableError, requestJson } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
 
-const PROFILE_STORAGE_KEY = "happyTailsProfile_v3";
+const PROFILE_STORAGE_KEY = "happyTailsProfile_v4";
 
 function getProfileKey(customerId = getSessionCustomerId()) {
   return getScopedStorageKey(PROFILE_STORAGE_KEY, customerId);
@@ -15,18 +15,22 @@ function readLocalProfile(customerId = getSessionCustomerId()) {
   }
 }
 
+function getQuery(customerId = getSessionCustomerId()) {
+  return `?customerId=${encodeURIComponent(customerId)}`;
+}
+
 export async function getCustomerProfile() {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson("/profile/me");
+    const response = await requestJson(`/profile/me${getQuery(customerId)}`);
     if (response?.profile) {
       localStorage.setItem(getProfileKey(customerId), JSON.stringify(response.profile));
       return response.profile;
     }
   } catch (error) {
     if (!isApiAvailableError(error)) {
-      // endpoint may not exist yet; gracefully use local profile
+      // Fallback for uninitialized server profile data.
     }
   }
 
@@ -37,7 +41,7 @@ export async function saveCustomerProfile(profile) {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson("/profile/me", { method: "PUT", body: profile });
+    const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: profile });
     if (response?.profile) {
       localStorage.setItem(getProfileKey(customerId), JSON.stringify(response.profile));
       return response.profile;

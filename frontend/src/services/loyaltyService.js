@@ -1,35 +1,35 @@
-import { getOrderHistory } from "./orderService";
-
-const COMPLETED_STATUSES = new Set(["Delivered", "Completed", "Picked Up", "Enjoy!"]);
-const COFFEE_PATTERN = /coffee|latte|frappe|americano|matcha|choco/i;
+import { ApiError, requestJson } from "./api";
+import { getSessionCustomerId } from "./sessionService";
 
 export async function getCustomerLoyaltyData(customerName = "") {
-  const orders = await getOrderHistory();
-  const completedOrders = orders.filter((order) => COMPLETED_STATUSES.has(order.status));
+  const customerId = getSessionCustomerId();
 
-  const eligibleOrders = completedOrders.filter((order) =>
-    COFFEE_PATTERN.test(order.items?.map((item) => item.name).join(" "))
-  );
+  try {
+    const response = await requestJson(`/loyalty/${encodeURIComponent(customerId)}`);
+    const loyalty = response?.loyalty;
 
-  const stampsRequired = 8;
-  const totalEligibleOrders = eligibleOrders.length;
-  const rewardsRedeemable = Math.floor(totalEligibleOrders / stampsRequired);
-  const stampCount = totalEligibleOrders % stampsRequired;
+    if (!loyalty) {
+      throw new Error("Loyalty account not found.");
+    }
 
-  return {
-    customerName,
-    stampCount,
-    stampsRequired,
-    rewardAvailable: rewardsRedeemable > 0,
-    rewardsRedeemable,
-    totalEligibleOrders,
-    completedOrdersCount: completedOrders.length,
-    progressMessage: `${stampCount} of ${stampsRequired} coffee stamps in your current reward cycle.`,
-    recentActivity: eligibleOrders.slice(0, 3).map((order) => ({
-      id: order.id,
-      earnedAt: order.updatedAt || order.createdAt,
-      points: 1,
-      status: order.status
-    }))
-  };
+    return {
+      customerName,
+      totalStamps: 10,
+      currentStampCount: loyalty.currentStampCount || 0,
+      totalStampsEarned: loyalty.totalStampsEarned || 0,
+      rewardMilestones: [
+        { stamp: 6, reward: "Free Latte" },
+        { stamp: 10, reward: "Free Groom" }
+      ],
+      rewardsUnlocked: loyalty.rewardsUnlocked || [],
+      lastStampedOrderId: loyalty.lastStampedOrderId || null,
+      updatedAt: loyalty.updatedAt || null,
+      recentActivity: []
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw new Error(error.data?.error || "Unable to load loyalty rewards right now.");
+    }
+    throw new Error("Unable to load loyalty rewards right now.");
+  }
 }

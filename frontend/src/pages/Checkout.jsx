@@ -10,8 +10,8 @@ const defaultForm = {
   name: "",
   phone: "",
   address: "",
-  orderType: "Dine-in",
-  payment: "Cash",
+  orderType: "dine_in",
+  paymentMethod: "cash",
   receiptName: "",
   notes: ""
 };
@@ -49,7 +49,7 @@ export default function Checkout() {
         email: user?.email || ""
       },
       orderType: form.orderType,
-      payment: form.payment,
+      paymentMethod: form.paymentMethod,
       receiptName: form.receiptName,
       notes: form.notes,
       items: cart,
@@ -124,13 +124,13 @@ export default function Checkout() {
 
           <label>Order Type</label>
           <select value={form.orderType} onChange={(e) => handleFieldChange("orderType", e.target.value)}>
-            <option value="Dine-in">Dine-in</option>
-            <option value="Pickup">Pickup</option>
-            <option value="Takeout">Takeout</option>
-            <option value="Delivery">Delivery</option>
+            <option value="dine_in">Dine-in</option>
+            <option value="pickup">Pickup</option>
+            <option value="takeout">Takeout</option>
+            <option value="delivery">Delivery</option>
           </select>
 
-          {form.orderType === "Delivery" ? (
+          {form.orderType === "delivery" ? (
             <>
               <label>Delivery Address</label>
               <input value={form.address} onChange={(e) => handleFieldChange("address", e.target.value)} />
@@ -139,13 +139,13 @@ export default function Checkout() {
           ) : null}
 
           <label>Payment</label>
-          <select value={form.payment} onChange={(e) => handleFieldChange("payment", e.target.value)}>
-            <option value="Cash">Cash</option>
-            <option value="Maya">Maya</option>
-            <option value="GCash">GCash</option>
+          <select value={form.paymentMethod} onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="e_wallet">E-Wallet (Maya/GCash)</option>
           </select>
 
-          {(form.payment === "GCash" || form.payment === "Maya") && (
+          {form.paymentMethod === "e_wallet" && (
             <>
               <label>Receipt Upload</label>
               <input
