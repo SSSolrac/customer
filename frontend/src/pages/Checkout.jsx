@@ -4,14 +4,15 @@ import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
 import { createOrder, validateCheckout } from "../services/orderService";
 import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
+import { labelToCanonicalOrderType, labelToCanonicalPaymentMethod } from "../constants/canonical";
 import "./Checkout.css";
 
 const defaultForm = {
   name: "",
   phone: "",
   address: "",
-  orderType: "dine_in",
-  paymentMethod: "cash",
+  orderType: "Dine-in",
+  paymentMethod: "Cash",
   receiptName: "",
   notes: ""
 };
@@ -39,6 +40,9 @@ export default function Checkout() {
     loadProfile();
   }, [user?.fullName]);
 
+  const canonicalOrderType = labelToCanonicalOrderType(form.orderType);
+  const canonicalPaymentMethod = labelToCanonicalPaymentMethod(form.paymentMethod);
+
   const payload = useMemo(
     () => ({
       customerId: user?.id || "guest",
@@ -48,8 +52,8 @@ export default function Checkout() {
         address: form.address,
         email: user?.email || ""
       },
-      orderType: form.orderType,
-      paymentMethod: form.paymentMethod,
+      orderType: labelToCanonicalOrderType(form.orderType),
+      paymentMethod: labelToCanonicalPaymentMethod(form.paymentMethod),
       receiptName: form.receiptName,
       notes: form.notes,
       items: cart,
@@ -124,13 +128,13 @@ export default function Checkout() {
 
           <label>Order Type</label>
           <select value={form.orderType} onChange={(e) => handleFieldChange("orderType", e.target.value)}>
-            <option value="dine_in">Dine-in</option>
-            <option value="pickup">Pickup</option>
-            <option value="takeout">Takeout</option>
-            <option value="delivery">Delivery</option>
+            <option value="Dine-in">Dine-in</option>
+            <option value="Pickup">Pickup</option>
+            <option value="Takeout">Takeout</option>
+            <option value="Delivery">Delivery</option>
           </select>
 
-          {form.orderType === "delivery" ? (
+          {canonicalOrderType === "delivery" ? (
             <>
               <label>Delivery Address</label>
               <input value={form.address} onChange={(e) => handleFieldChange("address", e.target.value)} />
@@ -140,12 +144,13 @@ export default function Checkout() {
 
           <label>Payment</label>
           <select value={form.paymentMethod} onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="e_wallet">E-Wallet (Maya/GCash)</option>
+            <option value="Cash">Cash</option>
+            <option value="Card">Card</option>
+            <option value="Maya">Maya</option>
+            <option value="GCash">GCash</option>
           </select>
 
-          {form.paymentMethod === "e_wallet" && (
+          {canonicalPaymentMethod === "e_wallet" && (
             <>
               <label>Receipt Upload</label>
               <input
