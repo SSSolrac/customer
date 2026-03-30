@@ -1,3 +1,5 @@
+import { requestJson } from "./api";
+import { getSessionCustomerId } from "./sessionService";
 import { getOrderHistory } from "./orderService";
 
 const COMPLETED_STATUSES = new Set(["Delivered", "Completed", "Picked Up", "Enjoy!"]);
@@ -10,8 +12,7 @@ const LOYALTY_MILESTONES = [
 const TOTAL_STAMPS = 10;
 
 export async function getCustomerLoyaltyData(customerName = "") {
-  const orders = await getOrderHistory();
-  const completedOrders = orders.filter((order) => COMPLETED_STATUSES.has(order.status));
+  const customerId = getSessionCustomerId();
 
   // Loyalty rule: earn 1 stamp per completed order.
   const currentStampCount = Math.min(completedOrders.length, TOTAL_STAMPS);
