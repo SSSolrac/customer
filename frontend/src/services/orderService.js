@@ -5,17 +5,6 @@ import { canonicalOrderTypeToLabel, canonicalPaymentMethodToLabel, canonicalStat
 const ORDER_STORE_KEY = "happyTailsOrders_v3";
 const LATEST_ORDER_KEY = "happyTailsLatestOrder_v3";
 
-const STATUS_LABELS = {
-  pending: "Pending",
-  preparing: "Preparing",
-  ready: "Ready",
-  out_for_delivery: "Out for Delivery",
-  completed: "Completed",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-  refunded: "Refunded"
-};
-
 const STATUS_STEPS_BY_ORDER_TYPE = {
   delivery: ["pending", "preparing", "ready", "out_for_delivery", "delivered"],
   dine_in: ["pending", "preparing", "ready", "completed"],
@@ -23,20 +12,8 @@ const STATUS_STEPS_BY_ORDER_TYPE = {
   takeout: ["pending", "preparing", "ready", "completed"]
 };
 
-const ORDER_TYPE_LABELS = {
-  dine_in: "Dine-in",
-  pickup: "Pickup",
-  takeout: "Takeout",
-  delivery: "Delivery"
-};
-
 function toCanonicalOrderType(value) {
-  const key = String(value || "").trim().toLowerCase();
-  if (["dine-in", "dine_in", "dinein"].includes(key)) return "dine_in";
-  if (["pickup"].includes(key)) return "pickup";
-  if (["takeout"].includes(key)) return "takeout";
-  if (["delivery"].includes(key)) return "delivery";
-  return "takeout";
+  return labelToCanonicalOrderType(value);
 }
 
 function getCustomerScopedKeys(customerId = getSessionCustomerId()) {
@@ -90,11 +67,11 @@ function normalizeOrder(order) {
     ...order,
     orderNumber: order.orderNumber || order.id,
     orderType,
-    orderTypeLabel: ORDER_TYPE_LABELS[orderType] || "Takeout",
+    orderTypeLabel: canonicalOrderTypeToLabel(orderType),
     status,
-    statusLabel: STATUS_LABELS[status] || "Pending",
-    paymentMethod: order.paymentMethod || "cash",
-    paymentMethodLabel: order.paymentMethod === "e_wallet" ? "E-Wallet" : String(order.paymentMethod || "cash").toUpperCase(),
+    statusLabel: canonicalStatusToLabel(status),
+    paymentMethod: labelToCanonicalPaymentMethod(order.paymentMethod || "cash"),
+    paymentMethodLabel: canonicalPaymentMethodToLabel(order.paymentMethod || "cash"),
     items,
     statusTimeline: timeline,
     total: Number(order.total || 0)
@@ -118,7 +95,7 @@ export function getStatusSteps(orderType) {
 }
 
 export function getStatusLabel(status) {
-  return STATUS_LABELS[String(status || "").toLowerCase()] || "Pending";
+  return canonicalStatusToLabel(status);
 }
 
 export async function validateCheckout(orderPayload) {
@@ -131,8 +108,8 @@ export async function validateCheckout(orderPayload) {
     errors.address = "Delivery address is required for delivery orders.";
   }
 
-  const payment = String(orderPayload.payment || "").toLowerCase();
-  if (["maya", "gcash"].includes(payment) && !orderPayload.receiptName) {
+  const paymentMethod = labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment);
+  if (paymentMethod === "e_wallet" && !orderPayload.receiptName) {
     errors.receipt = "Receipt upload is required for wallet payments.";
   }
 
@@ -147,7 +124,7 @@ function toCanonicalCreatePayload(orderPayload) {
     customerPhone: orderPayload.customer?.phone || "",
     customerAddress: orderPayload.customer?.address || "",
     orderType: toCanonicalOrderType(orderPayload.orderType),
-    paymentMethod: ["maya", "gcash"].includes(String(orderPayload.payment || "").toLowerCase()) ? "e_wallet" : String(orderPayload.payment || "cash").toLowerCase(),
+    paymentMethod: labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment || "cash"),
     paymentStatus: "pending",
     serviceFee: 0,
     discount: 0,
