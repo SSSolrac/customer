@@ -75,8 +75,8 @@ function LoyaltyCard({ loyaltyData }) {
       <div className="loyalty-card__meta">
         {recentActivity.length ? (
           <ul>
-            {recentActivity.map((entry, index) => (
-              <li key={entry.id || entry.orderId || index}>{(entry.id || entry.orderId || "Activity")} • {new Date(entry.earnedAt).toLocaleDateString()} • {entry.status} • +{entry.stampDelta} stamp</li>
+            {recentActivity.map((entry) => (
+              <li key={entry.id}>{entry.id} • {new Date(entry.earnedAt).toLocaleDateString()} • {entry.status} • +{entry.stampDelta} stamp</li>
             ))}
           </ul>
         ) : (

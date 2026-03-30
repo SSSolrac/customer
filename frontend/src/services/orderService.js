@@ -184,8 +184,8 @@ export async function getLatestOrder() {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson(`/orders${getOrderQuery(customerId)}`);
-    const order = Array.isArray(response.orders) && response.orders.length ? normalizeOrder(response.orders[0]) : null;
+    const response = await requestJson(`/orders/latest${getOrderQuery(customerId)}`);
+    const order = normalizeOrder(response.order);
     if (!order) return null;
     cacheOrder(order, customerId);
     return order;
