@@ -1,5 +1,6 @@
 import { ApiError, isApiAvailableError, requestJson } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
+import { canonicalOrderTypeToLabel, canonicalPaymentMethodToLabel, canonicalStatusToLabel, labelToCanonicalOrderType, labelToCanonicalPaymentMethod } from "../constants/canonical";
 
 const ORDER_STORE_KEY = "happyTailsOrders_v3";
 const LATEST_ORDER_KEY = "happyTailsLatestOrder_v3";
