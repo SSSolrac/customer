@@ -17,6 +17,15 @@ const defaultForm = {
   notes: ""
 };
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read the receipt file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
   const { cart, total, clearCart } = useCart();
@@ -24,6 +33,8 @@ export default function Checkout() {
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState("");
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -39,6 +50,12 @@ export default function Checkout() {
 
     loadProfile();
   }, [user?.fullName]);
+
+  useEffect(() => {
+    return () => {
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    };
+  }, [receiptPreviewUrl]);
 
   const canonicalOrderType = labelToCanonicalOrderType(form.orderType);
 
@@ -65,10 +82,60 @@ export default function Checkout() {
     setErrors((prev) => ({ ...prev, [key]: "" }));
   };
 
+  const handleReceiptChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+
+    const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+    if (!allowedTypes.has(file.type)) {
+      setErrors((prev) => ({ ...prev, receipt: "Upload a PNG, JPG, or WebP image." }));
+      event.target.value = "";
+      return;
+    }
+
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setErrors((prev) => ({ ...prev, receipt: "Receipt must be 5MB or smaller." }));
+      event.target.value = "";
+      return;
+    }
+
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptFile(file);
+    setReceiptPreviewUrl(URL.createObjectURL(file));
+    setErrors((prev) => ({ ...prev, receipt: "" }));
+  };
+
+  const removeReceipt = () => {
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptPreviewUrl("");
+    setReceiptFile(null);
+    setErrors((prev) => ({ ...prev, receipt: "" }));
+  };
+
   const submit = async (event) => {
     event.preventDefault();
 
-    const validation = await validateCheckout(payload);
+    if (!receiptFile) {
+      setErrors((prev) => ({ ...prev, receipt: "Receipt upload is required." }));
+      return;
+    }
+
+    let receiptDataUrl = "";
+    try {
+      receiptDataUrl = await fileToDataUrl(receiptFile);
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, receipt: error.message || "Could not read the receipt file." }));
+      return;
+    }
+
+    const payloadWithReceipt = {
+      ...payload,
+      receiptName: receiptFile.name,
+      receiptImageUrl: receiptDataUrl
+    };
+
+    const validation = await validateCheckout(payloadWithReceipt);
     if (!validation.isValid) {
       setErrors(validation.errors);
       return;
@@ -82,8 +149,9 @@ export default function Checkout() {
         address: form.address
       });
 
-      await createOrder(payload);
+      await createOrder(payloadWithReceipt);
       clearCart();
+      removeReceipt();
       navigate("/order-success");
     } catch (error) {
       setErrors({ form: error.message || "Could not place your order." });
@@ -152,6 +220,22 @@ export default function Checkout() {
             <p className="payment-qr-title">Scan to pay via {paymentMethodToLabel(form.paymentMethod)}</p>
             <img src={getPaymentQrAsset(form.paymentMethod)} alt={`${paymentMethodToLabel(form.paymentMethod)} QR code`} />
           </div>
+
+          <label>Upload Receipt <span className="required-indicator">*</span></label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleReceiptChange} />
+          <p className="field-hint">Upload a screenshot/photo of your payment receipt (PNG/JPG/WebP, max 5MB).</p>
+          {receiptFile ? (
+            <div className="receipt-preview" aria-live="polite">
+              <img src={receiptPreviewUrl} alt="Receipt preview" />
+              <div className="receipt-meta">
+                <span className="receipt-file-name">{receiptFile.name}</span>
+                <button type="button" className="receipt-remove" onClick={removeReceipt}>
+                  Remove receipt
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {errors.receipt ? <p className="field-error">{errors.receipt}</p> : null}
 
           <label>Notes (optional)</label>
           <textarea value={form.notes} onChange={(e) => handleFieldChange("notes", e.target.value)} />

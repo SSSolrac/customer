@@ -1,7 +1,7 @@
-import qrphQr from "../assets/payments/QRPH.webp";
-import gcashQr from "../assets/payments/GCASH.webp";
-import maribankQr from "../assets/payments/MARIBANK.webp";
-import bdoQr from "../assets/payments/BDO.webp";
+import qrphQr from "../assets/QRPH.webp";
+import gcashQr from "../assets/GCASH.webp";
+import maribankQr from "../assets/MARIBANK.webp";
+import bdoQr from "../assets/BDO.webp";
 import { CANONICAL_PAYMENT_METHODS, PAYMENT_METHOD_LABELS, labelToCanonicalPaymentMethod } from "../constants/canonical";
 
 export const PAYMENT_METHOD_OPTIONS = CANONICAL_PAYMENT_METHODS.map((value) => ({

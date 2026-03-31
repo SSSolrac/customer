@@ -113,6 +113,10 @@ export async function validateCheckout(orderPayload) {
     errors.paymentMethod = "Select a valid payment method.";
   }
 
+  if (!String(orderPayload.receiptName || orderPayload.receiptImageUrl || "").trim()) {
+    errors.receipt = "Receipt upload is required.";
+  }
+
   return { isValid: Object.keys(errors).length === 0, errors };
 }
 
@@ -131,6 +135,8 @@ function toCanonicalCreatePayload(orderPayload) {
     subtotal: Number(orderPayload.total || 0),
     total: Number(orderPayload.total || 0),
     notes: orderPayload.notes || "",
+    receiptName: orderPayload.receiptName || "",
+    receiptImageUrl: orderPayload.receiptImageUrl || "",
     items: (orderPayload.items || []).map((item) => ({
       id: item.id,
       itemName: item.name,

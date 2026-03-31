@@ -1,6 +1,7 @@
 const orderRepository = require("../repositories/orderRepository");
 const { mapCreateOrderPayload } = require("../mappers/orderMapper");
 const { makeId } = require("../utils/id");
+const { storeReceiptDataUrl } = require("../utils/receiptStorage");
 
 function appendHistory(orderId, status, { note = null, changedByUserId = null } = {}) {
   const historyEntry = {
@@ -22,6 +23,19 @@ function withHistory(order) {
 
 function createOrder(payload) {
   const canonicalOrder = mapCreateOrderPayload(payload);
+
+  const receiptDataUrl = payload?.receiptImageUrl;
+  const isDataUrl = typeof receiptDataUrl === "string" && receiptDataUrl.startsWith("data:");
+  if (isDataUrl) {
+    const storedReceiptUrl = storeReceiptDataUrl(receiptDataUrl, { orderId: canonicalOrder.id });
+    if (!storedReceiptUrl) {
+      const error = new Error("Unable to store receipt image.");
+      error.status = 400;
+      throw error;
+    }
+    canonicalOrder.receiptImageUrl = storedReceiptUrl;
+  }
+
   orderRepository.create(canonicalOrder);
   appendHistory(canonicalOrder.id, canonicalOrder.status, { note: "Order created" });
   return withHistory(canonicalOrder);

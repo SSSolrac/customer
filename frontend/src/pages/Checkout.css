@@ -8,6 +8,8 @@
 .checkout-submit { margin-top:14px; background:#36d7e8; color:#fff; border:none; border-radius:10px; padding:12px; font-weight:700; cursor:pointer; }
 .checkout-submit:disabled { opacity:.7; cursor:not-allowed; }
 .field-error { margin:6px 0 0; color:#bf2456; font-size:.85rem; }
+.field-hint { margin:6px 0 0; color:#666; font-size:.85rem; }
+.required-indicator { color:#bf2456; }
 .summary-row { display:flex; justify-content:space-between; margin-top:8px; }
 .total-row { font-weight:700; margin-top:12px; }
 .checkout-state { padding:120px 20px 40px; text-align:center; }
@@ -37,4 +39,52 @@
   max-width: 100%;
   height: auto;
   border-radius: 10px;
+}
+
+.receipt-preview {
+  margin-top: 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+  background: #fafafa;
+}
+
+.receipt-preview img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.receipt-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.receipt-file-name {
+  font-size: 0.9rem;
+  color: #333;
+  word-break: break-word;
+}
+
+.receipt-remove {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #444;
+}
+
+.receipt-remove:hover {
+  background: #f5f5f5;
 }

@@ -8,7 +8,13 @@ function customerIdFromReq(req) {
 function create(req, res) {
   const errors = validateCreateOrder(req.body);
   if (errors.length) return res.status(400).json({ error: errors.join(", ") });
-  return res.status(201).json({ order: orderService.createOrder(req.body) });
+
+  try {
+    return res.status(201).json({ order: orderService.createOrder(req.body) });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    return res.status(status).json({ error: error?.message || "Unable to create order." });
+  }
 }
 
 function list(req, res) {
