@@ -1,5 +1,5 @@
 export const CANONICAL_ORDER_STATUSES = ["pending", "preparing", "ready", "out_for_delivery", "completed", "delivered", "cancelled", "refunded"];
-export const CANONICAL_PAYMENT_METHODS = ["cash", "e_wallet"];
+export const CANONICAL_PAYMENT_METHODS = ["qrph", "gcash", "maribank", "bdo"];
 export const CANONICAL_PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 export const CANONICAL_ORDER_TYPES = ["dine_in", "pickup", "takeout", "delivery"];
 
@@ -15,8 +15,10 @@ export const STATUS_LABELS = {
 };
 
 export const PAYMENT_METHOD_LABELS = {
-  cash: "Cash",
-  e_wallet: "E-Wallet"
+  qrph: "QRPH",
+  gcash: "GCash",
+  maribank: "MariBank",
+  bdo: "BDO"
 };
 
 export const ORDER_TYPE_LABELS = {
@@ -31,7 +33,7 @@ export function canonicalStatusToLabel(status) {
 }
 
 export function canonicalPaymentMethodToLabel(method) {
-  return PAYMENT_METHOD_LABELS[String(method || "").toLowerCase()] || "Cash";
+  return PAYMENT_METHOD_LABELS[String(method || "").toLowerCase()] || "QRPH";
 }
 
 export function canonicalOrderTypeToLabel(type) {
@@ -40,8 +42,11 @@ export function canonicalOrderTypeToLabel(type) {
 
 export function labelToCanonicalPaymentMethod(value) {
   const key = String(value || "").trim().toLowerCase();
-  if (["maya", "gcash", "e-wallet", "e_wallet"].includes(key)) return "e_wallet";
-  return "cash";
+  if (CANONICAL_PAYMENT_METHODS.includes(key)) return key;
+  if (key === "qrph") return "qrph";
+  if (key === "gcash") return "gcash";
+  if (["mari bank", "mari-bank"].includes(key)) return "maribank";
+  return null;
 }
 
 export function labelToCanonicalOrderType(value) {

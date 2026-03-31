@@ -17,11 +17,11 @@ const STATUS_MAP = {
 };
 
 const PAYMENT_METHOD_MAP = {
-  cash: "cash",
-  maya: "e_wallet",
-  gcash: "e_wallet",
-  "e-wallet": "e_wallet",
-  e_wallet: "e_wallet"
+  qrph: "qrph",
+  gcash: "gcash",
+  maribank: "maribank",
+  "mari bank": "maribank",
+  bdo: "bdo"
 };
 
 const ORDER_TYPE_MAP = {

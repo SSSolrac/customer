@@ -70,8 +70,8 @@ function normalizeOrder(order) {
     orderTypeLabel: canonicalOrderTypeToLabel(orderType),
     status,
     statusLabel: canonicalStatusToLabel(status),
-    paymentMethod: labelToCanonicalPaymentMethod(order.paymentMethod || "cash"),
-    paymentMethodLabel: canonicalPaymentMethodToLabel(order.paymentMethod || "cash"),
+    paymentMethod: labelToCanonicalPaymentMethod(order.paymentMethod || "qrph"),
+    paymentMethodLabel: canonicalPaymentMethodToLabel(order.paymentMethod || "qrph"),
     items,
     statusTimeline: timeline,
     total: Number(order.total || 0)
@@ -109,8 +109,8 @@ export async function validateCheckout(orderPayload) {
   }
 
   const paymentMethod = labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment);
-  if (paymentMethod === "e_wallet" && !orderPayload.receiptName) {
-    errors.receipt = "Receipt upload is required for wallet payments.";
+  if (!["qrph", "gcash", "maribank", "bdo"].includes(paymentMethod)) {
+    errors.paymentMethod = "Select a valid payment method.";
   }
 
   return { isValid: Object.keys(errors).length === 0, errors };
@@ -124,14 +124,13 @@ function toCanonicalCreatePayload(orderPayload) {
     customerPhone: orderPayload.customer?.phone || "",
     customerAddress: orderPayload.customer?.address || "",
     orderType: toCanonicalOrderType(orderPayload.orderType),
-    paymentMethod: labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment || "cash"),
+    paymentMethod: labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment || "qrph"),
     paymentStatus: "pending",
     serviceFee: 0,
     discount: 0,
     subtotal: Number(orderPayload.total || 0),
     total: Number(orderPayload.total || 0),
     notes: orderPayload.notes || "",
-    receiptImageUrl: orderPayload.receiptName || "",
     items: (orderPayload.items || []).map((item) => ({
       id: item.id,
       itemName: item.name,

@@ -4,7 +4,8 @@ import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
 import { createOrder, validateCheckout } from "../services/orderService";
 import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
-import { labelToCanonicalOrderType, labelToCanonicalPaymentMethod } from "../constants/canonical";
+import { labelToCanonicalOrderType } from "../constants/canonical";
+import { PAYMENT_METHOD_OPTIONS, getPaymentQrAsset, paymentMethodToLabel } from "../utils/paymentMethods";
 import "./Checkout.css";
 
 const defaultForm = {
@@ -12,8 +13,7 @@ const defaultForm = {
   phone: "",
   address: "",
   orderType: "Dine-in",
-  paymentMethod: "Cash",
-  receiptName: "",
+  paymentMethod: "qrph",
   notes: ""
 };
 
@@ -41,7 +41,6 @@ export default function Checkout() {
   }, [user?.fullName]);
 
   const canonicalOrderType = labelToCanonicalOrderType(form.orderType);
-  const canonicalPaymentMethod = labelToCanonicalPaymentMethod(form.paymentMethod);
 
   const payload = useMemo(
     () => ({
@@ -53,8 +52,7 @@ export default function Checkout() {
         email: user?.email || ""
       },
       orderType: labelToCanonicalOrderType(form.orderType),
-      paymentMethod: labelToCanonicalPaymentMethod(form.paymentMethod),
-      receiptName: form.receiptName,
+      paymentMethod: form.paymentMethod,
       notes: form.notes,
       items: cart,
       total
@@ -144,23 +142,16 @@ export default function Checkout() {
 
           <label>Payment</label>
           <select value={form.paymentMethod} onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}>
-            <option value="Cash">Cash</option>
-            <option value="Card">Card</option>
-            <option value="Maya">Maya</option>
-            <option value="GCash">GCash</option>
+            {PAYMENT_METHOD_OPTIONS.map((method) => (
+              <option key={method.value} value={method.value}>{method.label}</option>
+            ))}
           </select>
+          {errors.paymentMethod ? <p className="field-error">{errors.paymentMethod}</p> : null}
 
-          {canonicalPaymentMethod === "e_wallet" && (
-            <>
-              <label>Receipt Upload</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleFieldChange("receiptName", e.target.files?.[0]?.name || "")}
-              />
-              {errors.receipt ? <p className="field-error">{errors.receipt}</p> : null}
-            </>
-          )}
+          <div className="payment-qr-preview" aria-live="polite">
+            <p className="payment-qr-title">Scan to pay via {paymentMethodToLabel(form.paymentMethod)}</p>
+            <img src={getPaymentQrAsset(form.paymentMethod)} alt={`${paymentMethodToLabel(form.paymentMethod)} QR code`} />
+          </div>
 
           <label>Notes (optional)</label>
           <textarea value={form.notes} onChange={(e) => handleFieldChange("notes", e.target.value)} />

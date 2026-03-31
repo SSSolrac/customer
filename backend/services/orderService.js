@@ -67,7 +67,7 @@ function canonicalizeIncomingOrder(payload) {
     customerAddress: payload.customerAddress || payload.customer?.address || "",
     orderType,
     status: normalizeStatus(payload.status || "pending"),
-    paymentMethod: normalizePaymentMethod(payload.paymentMethod || payload.payment),
+    paymentMethod: normalizePaymentMethod(payload.paymentMethod || payload.payment) || "qrph",
     paymentStatus: ["pending", "paid", "failed", "refunded"].includes(String(payload.paymentStatus || "").toLowerCase())
       ? String(payload.paymentStatus).toLowerCase()
       : "pending",

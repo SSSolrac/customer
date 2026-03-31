@@ -27,7 +27,7 @@ function mapCreateOrderPayload(payload) {
 
   const orderType = normalizeOrderType(payload.orderType) || "takeout";
   const status = normalizeStatus(payload.status) || "pending";
-  const paymentMethod = normalizePaymentMethod(payload.paymentMethod || payload.payment) || "cash";
+  const paymentMethod = normalizePaymentMethod(payload.paymentMethod || payload.payment) || "qrph";
   const paymentStatus = normalizePaymentStatus(payload.paymentStatus) || "pending";
 
   const rawItems = Array.isArray(payload.items) ? payload.items : [];

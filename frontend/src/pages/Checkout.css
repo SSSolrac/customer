@@ -12,3 +12,29 @@
 .total-row { font-weight:700; margin-top:12px; }
 .checkout-state { padding:120px 20px 40px; text-align:center; }
 @media (max-width: 780px){ .checkout-layout { grid-template-columns:1fr; } }
+
+.payment-qr-preview {
+  margin-top: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: #fafafa;
+}
+
+.payment-qr-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #444;
+  text-align: center;
+}
+
+.payment-qr-preview img {
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
