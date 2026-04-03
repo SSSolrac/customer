@@ -16,10 +16,13 @@ export function getApiBaseUrl() {
 }
 
 function buildUrl(path) {
-  if (!path.startsWith("/")) {
-    return `${API_BASE_URL}/${path}`;
-  }
+  if (!path.startsWith("/")) return `${API_BASE_URL}/${path}`;
   return `${API_BASE_URL}${path}`;
+}
+
+export function unwrapData(response, fallback = null) {
+  if (response && typeof response === "object" && "data" in response) return response.data;
+  return fallback;
 }
 
 export async function requestJson(path, options = {}) {
@@ -37,9 +40,7 @@ export async function requestJson(path, options = {}) {
 
   let data = null;
   const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    data = await response.json();
-  }
+  if (contentType.includes("application/json")) data = await response.json();
 
   if (!response.ok) {
     throw new ApiError(data?.error || `Request failed with status ${response.status}`, {

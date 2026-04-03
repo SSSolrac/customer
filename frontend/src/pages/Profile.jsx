@@ -7,12 +7,11 @@ import { useSession } from "../context/SessionContext";
 import "./Profile.css";
 
 const blankProfile = {
-  fullName: "",
+  name: "",
   phone: "",
   email: "",
-  address: "",
-  city: "",
-  notes: ""
+  addresses: [],
+  preferences: {}
 };
 
 function Profile() {
@@ -33,13 +32,13 @@ function Profile() {
         const profile = await getCustomerProfile();
         const mergedProfile = {
           ...blankProfile,
-          fullName: user?.fullName || "",
+          name: user?.fullName || "",
           email: user?.email || "",
           ...profile
         };
         setFormData(mergedProfile);
 
-        const data = await getCustomerLoyaltyData(mergedProfile.fullName);
+        const data = await getCustomerLoyaltyData(mergedProfile.name);
         setLoyaltyData(data);
       } catch {
         setError("We couldn't load your account details right now.");
@@ -60,7 +59,7 @@ function Profile() {
   const handleSave = async (event) => {
     event.preventDefault();
     const nextErrors = {};
-    if (!formData.fullName.trim()) nextErrors.fullName = "Name is required.";
+    if (!formData.name.trim()) nextErrors.name = "Name is required.";
     if (!/^\+?[0-9\-\s]{7,15}$/.test(formData.phone.trim())) nextErrors.phone = "Enter a valid phone number.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) nextErrors.email = "Enter a valid email address.";
 
@@ -74,7 +73,7 @@ function Profile() {
     try {
       await saveCustomerProfile(formData);
       setMessage("Profile saved. Checkout will use your latest details automatically.");
-      const data = await getCustomerLoyaltyData(formData.fullName);
+      const data = await getCustomerLoyaltyData(formData.name);
       setLoyaltyData(data);
     } catch {
       setError("Unable to save right now. Please try again.");
@@ -102,8 +101,8 @@ function Profile() {
       </div>
 
       <form className="profile-form" onSubmit={handleSave}>
-        <input type="text" name="fullName" placeholder="Full Name" value={formData.fullName} onChange={handleChange} />
-        {errors.fullName ? <p className="field-error">{errors.fullName}</p> : null}
+        <input type="text" name="name" placeholder="Full Name" value={formData.name} onChange={handleChange} />
+        {errors.name ? <p className="field-error">{errors.name}</p> : null}
 
         <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} />
         {errors.email ? <p className="field-error">{errors.email}</p> : null}
@@ -111,10 +110,13 @@ function Profile() {
         <input type="text" name="phone" placeholder="Phone Number" value={formData.phone} onChange={handleChange} />
         {errors.phone ? <p className="field-error">{errors.phone}</p> : null}
 
-        <input type="text" name="address" placeholder="Street Address" value={formData.address} onChange={handleChange} />
-        <input type="text" name="city" placeholder="City" value={formData.city} onChange={handleChange} />
-
-        <textarea name="notes" placeholder="Delivery Notes (optional)" value={formData.notes} onChange={handleChange} />
+        <input
+          type="text"
+          name="addresses"
+          placeholder="Primary Address"
+          value={Array.isArray(formData.addresses) ? (formData.addresses[0] || "") : ""}
+          onChange={(event) => handleChange({ target: { name: "addresses", value: [event.target.value] } })}
+        />
 
         <button type="submit" className="save-btn" disabled={isSaving}>
           {isSaving ? "Saving..." : "Save Information"}

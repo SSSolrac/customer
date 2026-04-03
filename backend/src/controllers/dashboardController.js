@@ -1,7 +1,7 @@
 const dashboardService = require("../services/dashboardService");
 
 function getSummary(req, res) {
-  res.json(dashboardService.getSummary());
+  return res.json({ data: dashboardService.getSummary(req.query.range) });
 }
 
 module.exports = { getSummary };

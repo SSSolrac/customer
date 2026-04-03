@@ -1,30 +1,16 @@
 import "./LoyaltyCard.css";
 
+const TOTAL_STAMPS = 10;
+
 function LoyaltyCard({ loyaltyData }) {
   const {
-    totalStamps = 10,
-    currentStampCount = 0,
-    rewardMilestones = [],
-    rewardsUnlocked = [],
+    stampCount = 0,
+    availableRewards = [],
     customerName,
     recentActivity = []
   } = loyaltyData;
 
-  const earnedStamps = Math.min(currentStampCount, totalStamps);
-  const stampSlots = Array.from({ length: totalStamps }, (_, index) => {
-    const slotNumber = index + 1;
-    const milestone = rewardMilestones.find((item) => item.stamp === slotNumber);
-
-    return {
-      key: `stamp-slot-${slotNumber}`,
-      slotNumber,
-      isFilled: slotNumber <= earnedStamps,
-      milestone
-    };
-  });
-
-  const nextMilestone = rewardMilestones.find(({ stamp }) => earnedStamps < stamp);
-  const stampsToNextReward = nextMilestone ? nextMilestone.stamp - earnedStamps : 0;
+  const earnedStamps = Math.min(stampCount, TOTAL_STAMPS);
 
   return (
     <section className="loyalty-card" aria-label="Customer loyalty card">
@@ -36,40 +22,22 @@ function LoyaltyCard({ loyaltyData }) {
       {customerName ? <p className="loyalty-card__customer">Hi {customerName}, welcome back.</p> : null}
 
       <div className="loyalty-card__progress-row">
-        <p className="loyalty-card__progress">{earnedStamps} / {totalStamps} stamps</p>
+        <p className="loyalty-card__progress">{earnedStamps} / {TOTAL_STAMPS} stamps</p>
         <p className="loyalty-card__remaining">
-          {nextMilestone
-            ? `${stampsToNextReward} stamp${stampsToNextReward === 1 ? "" : "s"} to unlock ${nextMilestone.reward}`
-            : "All loyalty rewards unlocked 🎉"}
+          {availableRewards.length
+            ? `Rewards unlocked: ${availableRewards.map((reward) => reward.label).join(", ")}`
+            : "Keep ordering to unlock rewards."}
         </p>
       </div>
 
-      <div className="loyalty-card__grid" role="list" aria-label="Loyalty stamp progress">
-        {stampSlots.map(({ key, slotNumber, isFilled, milestone }) => {
-          const rewardUnlocked = milestone ? rewardsUnlocked.includes(milestone.reward) : false;
-
-          return (
-            <div
-              key={key}
-              className={`stamp-slot ${isFilled ? "stamp-slot--filled" : ""} ${milestone ? "stamp-slot--milestone" : ""}`}
-              role="listitem"
-              aria-label={`Stamp ${slotNumber}${milestone ? ` milestone for ${milestone.reward}` : ""} ${isFilled ? "earned" : "not earned"}`}
-            >
-              <span className="stamp-slot__icon">{isFilled ? "🐾" : slotNumber}</span>
-              {milestone ? (
-                <div className={`stamp-slot__reward ${rewardUnlocked ? "stamp-slot__reward--unlocked" : ""}`}>
-                  <span>{milestone.reward}</span>
-                  {rewardUnlocked ? <strong>Unlocked</strong> : <small>at stamp {milestone.stamp}</small>}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="loyalty-card__milestones" aria-label="Reward milestones">
-        <p>Free Latte unlocked at 6 stamps.</p>
-        <p>Free Groom unlocked at 10 stamps.</p>
+      <div className="loyalty-card__milestones" aria-label="Available rewards">
+        {availableRewards.length ? (
+          availableRewards.map((reward) => (
+            <p key={reward.id}>{reward.label} (requires {reward.requiredStamps} stamps)</p>
+          ))
+        ) : (
+          <p>No rewards unlocked yet.</p>
+        )}
       </div>
 
       <div className="loyalty-card__meta">

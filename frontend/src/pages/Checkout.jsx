@@ -43,9 +43,9 @@ export default function Checkout() {
       if (!profile) return;
       setForm((prev) => ({
         ...prev,
-        name: profile?.fullName || user?.fullName || "",
+        name: profile?.name || user?.fullName || "",
         phone: profile?.phone || "",
-        address: profile?.address || ""
+        address: Array.isArray(profile?.addresses) ? (profile.addresses[0] || "") : ""
       }));
     };
 
@@ -146,9 +146,9 @@ export default function Checkout() {
     setIsSubmitting(true);
     try {
       await saveCustomerProfile({
-        fullName: form.name,
+        name: form.name,
         phone: form.phone,
-        address: form.address
+        addresses: form.address ? [form.address] : []
       });
 
       await createOrder(payloadWithReceipt);

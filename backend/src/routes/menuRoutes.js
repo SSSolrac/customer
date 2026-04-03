@@ -1,14 +1,17 @@
 const express = require("express");
 const c = require("../controllers/menuController");
+
 const r = express.Router();
 
 r.get("/", c.getMenu);
 r.post("/", c.postMenu);
-r.patch("/:menuItemId", c.patchMenu);
-r.delete("/:menuItemId", c.deleteMenu);
+r.put("/:id", c.putMenu);
+r.delete("/:id", c.deleteMenu);
+
 r.get("/daily", c.getDaily);
-r.post("/daily", c.postDaily);
-r.patch("/daily/:dailyMenuId", c.patchDaily);
-r.patch("/daily/:dailyMenuId/publish", c.publishDaily);
+r.put("/daily", c.putDaily);
+r.post("/daily/publish", c.publishDaily);
+r.post("/daily/unpublish", c.unpublishDaily);
+r.post("/daily/clear", c.clearDaily);
 
 module.exports = r;

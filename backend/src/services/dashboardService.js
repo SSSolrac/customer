@@ -1,58 +1,61 @@
 const orderService = require("./orderService");
-const profileService = require("./profileService");
-const loyaltyService = require("./loyaltyService");
 
-const emptyStatuses = {
-  pending: 0,
-  preparing: 0,
-  ready: 0,
-  out_for_delivery: 0,
-  completed: 0,
-  delivered: 0,
-  cancelled: 0,
-  refunded: 0
-};
+function parseRange(range) {
+  if (["today", "7d", "30d", "90d"].includes(range)) return range;
+  return "today";
+}
 
-function getSummary() {
-  const orders = orderService.listOrders();
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
+function daysFromRange(range) {
+  if (range === "7d") return 7;
+  if (range === "30d") return 30;
+  if (range === "90d") return 90;
+  return 1;
+}
 
-  const todayOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= dayMs);
-  const weekOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= 7 * dayMs);
-  const monthOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= 30 * dayMs);
+function isInDays(order, days) {
+  return Date.now() - new Date(order.createdAt).getTime() <= days * 24 * 60 * 60 * 1000;
+}
 
-  const sum = (arr) => arr.reduce((acc, o) => acc + Number(o.total || 0), 0);
-  const orderStatusSummary = orders.reduce((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
-    return acc;
-  }, { ...emptyStatuses });
+function getSummary(rangeInput) {
+  const range = parseRange(rangeInput);
+  const allOrders = orderService.listOrders();
+  const todayOrders = allOrders.filter((o) => isInDays(o, 1));
+  const rangeOrders = allOrders.filter((o) => isInDays(o, daysFromRange(range)));
 
-  const itemMap = new Map();
-  orders.forEach((o) => o.items.forEach((i) => {
-    const curr = itemMap.get(i.itemName) || { itemName: i.itemName, qtySold: 0, revenue: 0 };
-    curr.qtySold += i.qty;
-    curr.revenue += i.lineTotal;
-    itemMap.set(i.itemName, curr);
-  }));
+  const sumTotal = (orders) => orders.reduce((acc, o) => acc + Number(o.total || 0), 0);
 
-  const customers = profileService.listCustomers();
-  const activeLoyaltyCustomers = customers.filter((c) => loyaltyService.getLoyaltyAccount(c.id).totalStampsEarned > 0).length;
+  const topMap = new Map();
+  rangeOrders.forEach((o) => {
+    (o.items || []).forEach((i) => {
+      const key = i.menuItemId || i.itemName;
+      const row = topMap.get(key) || { itemName: i.itemName || "Item", quantity: 0, revenue: 0 };
+      row.quantity += Number(i.qty || 0);
+      row.revenue += Number(i.lineTotal || 0);
+      topMap.set(key, row);
+    });
+  });
+
+  const countStatus = (status) => rangeOrders.filter((o) => o.status === status).length;
 
   return {
-    salesSummary: {
-      todaySales: sum(todayOrders),
-      weeklySales: sum(weekOrders),
-      monthlySales: sum(monthOrders),
-      averageOrderValue: orders.length ? sum(orders) / orders.length : 0
+    sales: {
+      today: sumTotal(todayOrders),
+      rangeTotal: sumTotal(rangeOrders),
+      averageOrderValue: rangeOrders.length ? sumTotal(rangeOrders) / rangeOrders.length : 0
     },
-    orderStatusSummary,
-    recentOrders: orders.slice(0, 10),
-    topSellingItems: [...itemMap.values()].sort((a, b) => b.qtySold - a.qtySold).slice(0, 10),
-    customerSummary: {
-      totalCustomers: customers.length,
-      activeLoyaltyCustomers
-    }
+    orders: {
+      today: todayOrders.length,
+      rangeTotal: rangeOrders.length,
+      pending: countStatus("pending"),
+      preparing: countStatus("preparing"),
+      ready: countStatus("ready"),
+      outForDelivery: countStatus("out_for_delivery"),
+      completed: countStatus("completed") + countStatus("delivered"),
+      cancelled: countStatus("cancelled") + countStatus("refunded")
+    },
+    topItems: [...topMap.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 10),
+    recentOrders: rangeOrders.slice(0, 10),
+    alerts: []
   };
 }
 

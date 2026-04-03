@@ -1,4 +1,4 @@
-import { ApiError, isApiAvailableError, requestJson } from "./api";
+import { ApiError, isApiAvailableError, requestJson, unwrapData } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
 import {
   canonicalOrderTypeToLabel,
@@ -233,7 +233,8 @@ export async function createOrder(orderPayload) {
     method: "POST",
     body: canonicalPayload
   });
-  const order = normalizeOrder({ ...response.order, paidAt: response.order?.paidAt || canonicalPayload.paidAt, paymentStatus: "paid" });
+  const data = unwrapData(response, {});
+  const order = normalizeOrder({ ...data, paidAt: data?.paidAt || canonicalPayload.paidAt, paymentStatus: "paid" });
   cacheOrder(order, order.customerId);
   return order;
 }
@@ -253,7 +254,7 @@ export async function cancelOrder(order, note = "Cancelled by customer within al
     body: { status: "cancelled", note }
   });
 
-  const updatedOrder = normalizeOrder(response.order);
+  const updatedOrder = normalizeOrder(unwrapData(response, null));
   cacheOrder(updatedOrder, customerId);
   return updatedOrder;
 }
@@ -262,11 +263,11 @@ export async function getLatestOrder() {
   const customerId = getSessionCustomerId();
 
   try {
-    const response = await requestJson(`/orders/latest${getOrderQuery(customerId)}`);
-    const order = normalizeOrder(response.order);
-    if (!order) return null;
-    cacheOrder(order, customerId);
-    return order;
+    const history = await getOrderHistory();
+    const latest = history[0] || null;
+    if (!latest) return null;
+    cacheOrder(latest, customerId);
+    return latest;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     if (!shouldFallbackToLocal(error)) throw error;
@@ -283,7 +284,7 @@ export async function getOrderById(orderId) {
 
   try {
     const response = await requestJson(`/orders/${encodeURIComponent(orderId)}${getOrderQuery(customerId)}`);
-    const order = normalizeOrder(response.order);
+    const order = normalizeOrder(unwrapData(response, null));
     if (!order) return null;
     cacheOrder(order, customerId);
     return order;
@@ -299,7 +300,8 @@ export async function getOrderHistory() {
 
   try {
     const response = await requestJson(`/orders${getOrderQuery(customerId)}`);
-    const normalized = Array.isArray(response.orders) ? response.orders.map(normalizeOrder).sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt)) : [];
+    const orders = unwrapData(response, []);
+    const normalized = Array.isArray(orders) ? orders.map(normalizeOrder).sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt)) : [];
     writeOrders(normalized, customerId);
     return normalized;
   } catch (error) {
@@ -312,7 +314,8 @@ export async function getOrderStatusHistory(orderId) {
   if (!orderId) return [];
   const customerId = getSessionCustomerId();
   const response = await requestJson(`/orders/${encodeURIComponent(orderId)}/history${getOrderQuery(customerId)}`);
-  return Array.isArray(response.history) ? response.history.map((entry) => ({ ...entry, status: String(entry.status || "").toLowerCase() })) : [];
+  const history = unwrapData(response, []);
+  return Array.isArray(history) ? history.map((entry) => ({ ...entry, status: String(entry.status || "").toLowerCase() })) : [];
 }
 
 export function syncCachedOrderPaidAt(orderId, paidAt) {
