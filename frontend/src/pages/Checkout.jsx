@@ -43,14 +43,14 @@ export default function Checkout() {
       if (!profile) return;
       setForm((prev) => ({
         ...prev,
-        name: profile?.name || user?.fullName || "",
+        name: profile?.name || "",
         phone: profile?.phone || "",
         address: Array.isArray(profile?.addresses) ? (profile.addresses[0] || "") : ""
       }));
     };
 
     loadProfile();
-  }, [user?.fullName]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -180,7 +180,7 @@ export default function Checkout() {
         <Link to="/cart">← Back to Cart</Link>
       </div>
       <p className="profile-session">
-        Ordering as <strong>{isAuthenticated ? (user?.email || user?.fullName) : (isGuest ? "Guest" : "Anonymous")}</strong>
+        Ordering as <strong>{isAuthenticated ? (user?.email || form.name || "Authenticated user") : (isGuest ? "Guest" : "Anonymous")}</strong>
       </p>
 
       <div className="checkout-layout">
