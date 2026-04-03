@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOrderTracking } from "../hooks/useOrderTracking";
-import { getStatusLabel } from "../services/orderService";
+import {
+  cancelOrder,
+  formatRemainingCancellationTime,
+  getOrderCancellationState,
+  getStatusLabel
+} from "../services/orderService";
+import { syncCustomerNotifications } from "../services/notificationService";
 import "./TrackOrder.css";
 
 function formatTimestamp(value) {
@@ -12,10 +18,25 @@ function formatTimestamp(value) {
 export default function TrackOrder() {
   const { order, isLoading, error, steps, currentStepIndex, loadLatest, lookupByOrderId } = useOrderTracking();
   const [searchId, setSearchId] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [countdownNow, setCountdownNow] = useState(Date.now());
 
   useEffect(() => {
     loadLatest();
   }, [loadLatest]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCountdownNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!order) return;
+    syncCustomerNotifications();
+  }, [order]);
+
+  const cancellationState = useMemo(() => getOrderCancellationState(order, countdownNow), [order, countdownNow]);
 
   const activeTimeline = useMemo(() => {
     const timelineMap = new Map((order?.statusTimeline || []).map((entry) => [entry.status, entry.at]));
@@ -29,7 +50,25 @@ export default function TrackOrder() {
   const handleLookup = async (event) => {
     event.preventDefault();
     if (!searchId.trim()) return;
+    setActionMessage("");
     await lookupByOrderId(searchId);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || !cancellationState.canCancel) return;
+    setCancelling(true);
+    setActionMessage("");
+
+    try {
+      await cancelOrder(order);
+      await loadLatest();
+      await syncCustomerNotifications();
+      setActionMessage("Order cancelled successfully.");
+    } catch (cancelError) {
+      setActionMessage(cancelError.message || "Unable to cancel this order right now.");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -71,10 +110,26 @@ export default function TrackOrder() {
             </div>
             <p><strong>Order ID:</strong> {order.orderNumber || order.id}</p>
             <p><strong>Placed:</strong> {formatTimestamp(order.createdAt)}</p>
+            <p><strong>Paid at:</strong> {formatTimestamp(order.paidAt)}</p>
             <p><strong>Last update:</strong> {formatTimestamp(order.updatedAt)}</p>
             <p><strong>Payment:</strong> {order.paymentMethodLabel}</p>
             <p><strong>Total:</strong> ₱{Number(order.total || 0).toFixed(2)}</p>
             <p><strong>Items:</strong> {order.items?.map((item) => `${item.itemName} × ${item.qty}`).join(", ")}</p>
+
+            <div className="track-cancel-panel">
+              <h3>Need to cancel?</h3>
+              {cancellationState.canCancel ? (
+                <p className="track-cancel-info">
+                  Cancellation is available for <strong>{formatRemainingCancellationTime(cancellationState.remainingSeconds)}</strong>
+                </p>
+              ) : (
+                <p className="track-cancel-expired">{cancellationState.reason || "Cancellation is unavailable for this order."}</p>
+              )}
+              <button type="button" onClick={handleCancelOrder} disabled={!cancellationState.canCancel || cancelling}>
+                {cancelling ? "Cancelling..." : "Cancel order"}
+              </button>
+              {actionMessage ? <p className="track-meta">{actionMessage}</p> : null}
+            </div>
           </div>
 
           <div className="track-timeline">

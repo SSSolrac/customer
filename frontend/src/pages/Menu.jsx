@@ -57,6 +57,7 @@ function Menu() {
             <img src={item.image} alt={item.name} />
             <h3>{item.name}</h3>
             <p>₱{item.price}</p>
+            {item.discountPercent ? <p className="menu-discount-tag">{item.discountPercent}% OFF</p> : null}
             <span className={item.availability === "Available" ? "available" : "sold-out"}>{item.availability}</span>
           </article>
         ))}

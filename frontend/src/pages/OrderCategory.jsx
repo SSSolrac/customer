@@ -48,6 +48,11 @@ export default function OrderCategory() {
                 <h3 className="item-name">{item.name}</h3>
                 <span className="price">₱{item.price}</span>
               </div>
+              {item.discountPercent ? (
+                <p className="item-discount-badge">
+                  {item.flashSale ? "Flash sale" : "Promo"}: {item.discountPercent}% OFF
+                </p>
+              ) : null}
 
               <button className="add-btn" onClick={() => addItem(item)}>
                 Add to Basket

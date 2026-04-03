@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getOrderHistory, getStatusLabel } from "../services/orderService";
+import { formatRemainingCancellationTime, getOrderCancellationState, getOrderHistory, getStatusLabel } from "../services/orderService";
 import "./OrderHistory.css";
 
 function formatMoney(value) {
@@ -63,9 +63,17 @@ export default function OrderHistory() {
               </div>
 
               <p>Placed: {formatDateTime(order.createdAt)}</p>
+              <p>Paid: {formatDateTime(order.paidAt)}</p>
               <p>
                 {order.orderTypeLabel} • {order.paymentMethodLabel} • {order.items.length} items • <strong>{formatMoney(order.total)}</strong>
               </p>
+              {(() => {
+                const cancellationState = getOrderCancellationState(order);
+                if (cancellationState.canCancel) {
+                  return <p className="history-items-summary">Cancelable for {formatRemainingCancellationTime(cancellationState.remainingSeconds)}</p>;
+                }
+                return <p className="history-items-summary">{cancellationState.reason}</p>;
+              })()}
 
               <p className="history-items-summary">
                 {order.items.slice(0, 2).map((item) => `${item.itemName} × ${item.qty}`).join(", ")}

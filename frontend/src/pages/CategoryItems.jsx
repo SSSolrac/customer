@@ -39,6 +39,9 @@ export default function CategoryItems() {
                 <span className="cat-tag">{category?.label}</span>
                 <span className="cat-price">₱{item.price}</span>
               </div>
+              {item.discountPercent ? (
+                <div className="cat-discount">{item.flashSale ? "Flash sale" : "Promo"}: {item.discountPercent}% OFF</div>
+              ) : null}
 
               <button
                 className="cat-addBtn"

@@ -17,6 +17,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import TrackOrder from "./pages/TrackOrder";
+import Notifications from "./pages/Notifications";
 import pattern from "./assets/pattern.png";
 import { useSession } from "./context/SessionContext";
 
@@ -80,6 +81,7 @@ function App() {
           <Route path="/order/:category" element={<OrderCategory />} />
           <Route path="/order-success" element={<OrderSuccess />} />
           <Route path="/track-order" element={<TrackOrder />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

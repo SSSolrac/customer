@@ -111,6 +111,15 @@
 .cat-price {
   font-weight: 900;
 }
+.cat-discount {
+  width: fit-content;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #9c2155;
+  background: #ffe5ef;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
 
 .cat-addBtn {
   border: 0;
