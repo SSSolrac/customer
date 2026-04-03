@@ -1,4 +1,4 @@
-import { isApiAvailableError, requestJson } from "./api";
+import { isApiAvailableError, requestJson, unwrapData } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
 
 const PROFILE_STORAGE_KEY = "happyTailsProfile_v4";
@@ -24,9 +24,10 @@ export async function getCustomerProfile() {
 
   try {
     const response = await requestJson(`/profile/me${getQuery(customerId)}`);
-    if (response?.profile) {
-      localStorage.setItem(getProfileKey(customerId), JSON.stringify(response.profile));
-      return response.profile;
+    const profile = unwrapData(response, null);
+    if (profile) {
+      localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
+      return profile;
     }
   } catch (error) {
     if (!isApiAvailableError(error)) {
@@ -42,9 +43,10 @@ export async function saveCustomerProfile(profile) {
 
   try {
     const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: profile });
-    if (response?.profile) {
-      localStorage.setItem(getProfileKey(customerId), JSON.stringify(response.profile));
-      return response.profile;
+    const profile = unwrapData(response, null);
+    if (profile) {
+      localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
+      return profile;
     }
   } catch (error) {
     if (!isApiAvailableError(error)) {

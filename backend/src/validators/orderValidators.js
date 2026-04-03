@@ -1,4 +1,4 @@
-const { ORDER_STATUS, PAYMENT_METHOD, PAYMENT_STATUS } = require("../utils/enums");
+const { ORDER_STATUS, PAYMENT_STATUS } = require("../utils/enums");
 const { normalizeStatus, normalizePaymentMethod, normalizePaymentStatus, normalizeOrderType } = require("../utils/normalizers");
 
 function validateCreateOrder(payload) {
@@ -32,11 +32,9 @@ function validateStatusPatch(payload) {
 }
 
 function validatePaymentPatch(payload) {
-  const paymentMethod = normalizePaymentMethod(payload?.paymentMethod || payload?.payment);
   const paymentStatus = normalizePaymentStatus(payload?.paymentStatus);
-  if (!paymentMethod || !PAYMENT_METHOD.includes(paymentMethod)) return { error: "Invalid paymentMethod." };
-  if (paymentStatus && !PAYMENT_STATUS.includes(paymentStatus)) return { error: "Invalid paymentStatus." };
-  return { paymentMethod, paymentStatus: paymentStatus || undefined };
+  if (!paymentStatus || !PAYMENT_STATUS.includes(paymentStatus)) return { error: "Invalid paymentStatus." };
+  return { paymentStatus };
 }
 
 module.exports = { validateCreateOrder, validateStatusPatch, validatePaymentPatch };

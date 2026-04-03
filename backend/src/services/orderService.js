@@ -65,8 +65,7 @@ function updateOrderPayment(orderId, patch, customerId) {
   const order = getOrder(orderId, customerId);
   if (!order) return null;
   const updated = orderRepository.update(order.id, {
-    paymentMethod: patch.paymentMethod,
-    ...(patch.paymentStatus ? { paymentStatus: patch.paymentStatus } : {}),
+    paymentStatus: patch.paymentStatus,
     updatedAt: new Date().toISOString()
   });
   return withHistory(updated);
