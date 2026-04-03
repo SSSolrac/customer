@@ -1,58 +1,62 @@
 const orderService = require("./orderService");
-const profileService = require("./profileService");
-const loyaltyService = require("./loyaltyService");
 
-const emptyStatuses = {
-  pending: 0,
-  preparing: 0,
-  ready: 0,
-  out_for_delivery: 0,
-  completed: 0,
-  delivered: 0,
-  cancelled: 0,
-  refunded: 0
-};
+function parseRange(range) {
+  if (["today", "7d", "30d", "90d"].includes(range)) return range;
+  return "today";
+}
 
-function getSummary() {
+function daysFromRange(range) {
+  if (range === "7d") return 7;
+  if (range === "30d") return 30;
+  if (range === "90d") return 90;
+  return 1;
+}
+
+function getSummary(rangeInput) {
+  const range = parseRange(rangeInput);
   const orders = orderService.listOrders();
   const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
+  const days = daysFromRange(range);
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
 
-  const todayOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= dayMs);
-  const weekOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= 7 * dayMs);
-  const monthOrders = orders.filter((o) => now - new Date(o.createdAt).getTime() <= 30 * dayMs);
+  const filtered = orders.filter((o) => new Date(o.createdAt).getTime() >= cutoff);
+  const totalSales = filtered.reduce((acc, o) => acc + Number(o.total || 0), 0);
 
-  const sum = (arr) => arr.reduce((acc, o) => acc + Number(o.total || 0), 0);
-  const orderStatusSummary = orders.reduce((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
+  const ordersByStatus = filtered.reduce((acc, o) => {
+    const key = o.status || "pending";
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
-  }, { ...emptyStatuses });
+  }, {});
 
   const itemMap = new Map();
-  orders.forEach((o) => o.items.forEach((i) => {
-    const curr = itemMap.get(i.itemName) || { itemName: i.itemName, qtySold: 0, revenue: 0 };
-    curr.qtySold += i.qty;
-    curr.revenue += i.lineTotal;
-    itemMap.set(i.itemName, curr);
-  }));
-
-  const customers = profileService.listCustomers();
-  const activeLoyaltyCustomers = customers.filter((c) => loyaltyService.getLoyaltyAccount(c.id).totalStampsEarned > 0).length;
+  filtered.forEach((o) => {
+    (o.items || []).forEach((i) => {
+      const key = i.menuItemId || i.itemName;
+      const current = itemMap.get(key) || {
+        menuItemId: i.menuItemId || null,
+        name: i.itemName || "Item",
+        qtySold: 0,
+        revenue: 0
+      };
+      current.qtySold += Number(i.qty || 0);
+      current.revenue += Number(i.lineTotal || 0);
+      itemMap.set(key, current);
+    });
+  });
 
   return {
-    salesSummary: {
-      todaySales: sum(todayOrders),
-      weeklySales: sum(weekOrders),
-      monthlySales: sum(monthOrders),
-      averageOrderValue: orders.length ? sum(orders) / orders.length : 0
+    sales: {
+      total: totalSales,
+      averageOrderValue: filtered.length ? totalSales / filtered.length : 0,
+      range
     },
-    orderStatusSummary,
-    recentOrders: orders.slice(0, 10),
-    topSellingItems: [...itemMap.values()].sort((a, b) => b.qtySold - a.qtySold).slice(0, 10),
-    customerSummary: {
-      totalCustomers: customers.length,
-      activeLoyaltyCustomers
-    }
+    orders: {
+      total: filtered.length,
+      byStatus: ordersByStatus
+    },
+    topItems: [...itemMap.values()].sort((a, b) => b.qtySold - a.qtySold).slice(0, 10),
+    recentOrders: filtered.slice(0, 10),
+    alerts: []
   };
 }
 

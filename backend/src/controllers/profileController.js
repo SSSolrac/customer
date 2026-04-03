@@ -6,13 +6,13 @@ function myId(req) {
 }
 
 function getMe(req, res) {
-  res.json({ profile: profileService.getProfile(myId(req)) });
+  return res.json({ data: profileService.getProfile(myId(req)) });
 }
 
 function putMe(req, res) {
   const errors = validateProfilePayload(req.body);
   if (errors.length) return res.status(400).json({ error: errors.join(", ") });
-  res.json({ profile: profileService.upsertProfile(myId(req), req.body || {}) });
+  return res.json({ data: profileService.upsertProfile(myId(req), req.body || {}) });
 }
 
 module.exports = { getMe, putMe };

@@ -1,4 +1,4 @@
-import { requestJson } from "./api";
+import { requestJson, unwrapData } from "./api";
 import { MENU } from "../data/menuData";
 
 function deriveDailyPicksFallback() {
@@ -19,7 +19,8 @@ function deriveDailyPicksFallback() {
 
 export async function getCurrentDailyMenu() {
   try {
-    return await requestJson("/menu/daily");
+    const response = await requestJson("/menu/daily");
+    return unwrapData(response, null) || response;
   } catch {
     const categories = deriveDailyPicksFallback();
     return {
@@ -34,5 +35,6 @@ export async function getCurrentDailyMenu() {
 
 export async function getMenuCatalog() {
   const response = await requestJson("/menu");
-  return Array.isArray(response.items) ? response.items : [];
+  const items = unwrapData(response, []);
+  return Array.isArray(items) ? items : [];
 }

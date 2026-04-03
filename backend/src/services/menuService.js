@@ -1,74 +1,107 @@
 const menuRepository = require("../repositories/menuRepository");
 const { makeId } = require("../utils/id");
 
+function withInventoryStatus(item) {
+  const stock = Number(item.stock || 0);
+  const threshold = Number(item.lowStockThreshold || 0);
+  let inventoryStatus = "in_stock";
+  if (stock <= 0) inventoryStatus = "out_of_stock";
+  else if (stock <= threshold) inventoryStatus = "low_stock";
+  return { ...item, inventoryStatus };
+}
+
 function getMenu() {
-  return menuRepository.getItems();
+  return menuRepository.getItems().map(withInventoryStatus);
 }
 
 function createMenuItem(payload) {
   const now = new Date().toISOString();
   const item = {
     id: makeId("menu_item"),
-    categoryId: payload.categoryId || null,
-    name: payload.name,
-    description: payload.description || null,
+    categoryId: payload.categoryId || "",
+    name: payload.name || "",
+    description: payload.description || "",
     price: Number(payload.price || 0),
     isAvailable: payload.isAvailable ?? true,
     imageUrl: payload.imageUrl || null,
+    stock: Number(payload.stock || 0),
+    lowStockThreshold: Number(payload.lowStockThreshold || 0),
+    discount: Number(payload.discount || 0),
     createdAt: now,
     updatedAt: now
   };
-  return menuRepository.createItem(item);
+  return withInventoryStatus(menuRepository.createItem(item));
 }
 
 function updateMenuItem(menuItemId, payload) {
-  return menuRepository.updateItem(menuItemId, { ...payload, updatedAt: new Date().toISOString() });
+  const item = menuRepository.updateItem(menuItemId, {
+    ...payload,
+    ...(payload.price !== undefined ? { price: Number(payload.price) } : {}),
+    ...(payload.stock !== undefined ? { stock: Number(payload.stock) } : {}),
+    ...(payload.lowStockThreshold !== undefined ? { lowStockThreshold: Number(payload.lowStockThreshold) } : {}),
+    ...(payload.discount !== undefined ? { discount: Number(payload.discount) } : {}),
+    updatedAt: new Date().toISOString()
+  });
+  return item ? withInventoryStatus(item) : null;
 }
 
 function deleteMenuItem(menuItemId) {
   return menuRepository.removeItem(menuItemId);
 }
 
-function listDailyMenus() {
-  return menuRepository.getDailyMenus();
+function toDailyMenuItem(item) {
+  const menuItem = menuRepository.getItemById(item.menuItemId);
+  return {
+    id: item.id || makeId("daily_menu_item"),
+    menuItemId: item.menuItemId,
+    name: item.name || menuItem?.name || "",
+    price: Number(item.price ?? menuItem?.price ?? 0),
+    categoryId: item.categoryId || menuItem?.categoryId || "",
+    isAvailable: item.isAvailable ?? menuItem?.isAvailable ?? true
+  };
 }
 
-function createDailyMenu(payload) {
+function emptyDailyMenu() {
   const now = new Date().toISOString();
-  const menu = {
+  return {
     id: makeId("daily_menu"),
-    menuDate: payload.menuDate,
-    isPublished: payload.isPublished ?? false,
+    menuDate: now.slice(0, 10),
+    isPublished: false,
     createdAt: now,
     updatedAt: now,
-    items: (payload.items || []).map((item, index) => ({
-      id: makeId("daily_menu_item"),
-      dailyMenuId: "",
-      menuItemId: item.menuItemId,
-      isAvailable: item.isAvailable ?? true,
-      sortOrder: item.sortOrder ?? index + 1
-    }))
+    items: []
   };
-  menu.items = menu.items.map((i) => ({ ...i, dailyMenuId: menu.id }));
-  return menuRepository.createDailyMenu(menu);
 }
 
-function updateDailyMenu(dailyMenuId, payload) {
-  const patch = { ...payload, updatedAt: new Date().toISOString() };
-  if (Array.isArray(payload.items)) {
-    patch.items = payload.items.map((item, index) => ({
-      id: item.id || makeId("daily_menu_item"),
-      dailyMenuId,
-      menuItemId: item.menuItemId,
-      isAvailable: item.isAvailable ?? true,
-      sortOrder: item.sortOrder ?? index + 1
-    }));
-  }
-  return menuRepository.updateDailyMenu(dailyMenuId, patch);
+function getDailyMenu() {
+  const existing = menuRepository.getDailyMenus()[0];
+  return existing || emptyDailyMenu();
 }
 
-function publishDailyMenu(dailyMenuId, isPublished) {
-  return menuRepository.updateDailyMenu(dailyMenuId, { isPublished, updatedAt: new Date().toISOString() });
+function upsertDailyMenu(payload) {
+  const existing = menuRepository.getDailyMenus()[0];
+  const now = new Date().toISOString();
+  const next = {
+    id: existing?.id || makeId("daily_menu"),
+    menuDate: payload.menuDate || existing?.menuDate || now.slice(0, 10),
+    isPublished: payload.isPublished ?? existing?.isPublished ?? false,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    items: Array.isArray(payload.items) ? payload.items.map(toDailyMenuItem) : (existing?.items || [])
+  };
+
+  if (existing) return menuRepository.updateDailyMenu(existing.id, next);
+  return menuRepository.createDailyMenu(next);
+}
+
+function setDailyPublished(isPublished) {
+  const current = getDailyMenu();
+  return upsertDailyMenu({ ...current, isPublished });
+}
+
+function clearDailyMenu() {
+  const current = getDailyMenu();
+  return upsertDailyMenu({ ...current, isPublished: false, items: [] });
 }
 
 module.exports = {
@@ -76,8 +109,8 @@ module.exports = {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
-  listDailyMenus,
-  createDailyMenu,
-  updateDailyMenu,
-  publishDailyMenu
+  getDailyMenu,
+  upsertDailyMenu,
+  setDailyPublished,
+  clearDailyMenu
 };
