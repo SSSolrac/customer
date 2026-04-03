@@ -18,9 +18,14 @@ function getSummary(rangeInput) {
   const now = Date.now();
   const days = daysFromRange(range);
   const cutoff = now - days * 24 * 60 * 60 * 1000;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayCutoff = todayStart.getTime();
 
   const filtered = orders.filter((o) => new Date(o.createdAt).getTime() >= cutoff);
+  const todayOrders = orders.filter((o) => new Date(o.createdAt).getTime() >= todayCutoff);
   const totalSales = filtered.reduce((acc, o) => acc + Number(o.total || 0), 0);
+  const todaySales = todayOrders.reduce((acc, o) => acc + Number(o.total || 0), 0);
 
   const ordersByStatus = filtered.reduce((acc, o) => {
     const key = o.status || "pending";
@@ -34,11 +39,11 @@ function getSummary(rangeInput) {
       const key = i.menuItemId || i.itemName;
       const current = itemMap.get(key) || {
         menuItemId: i.menuItemId || null,
-        name: i.itemName || "Item",
-        qtySold: 0,
+        itemName: i.itemName || "Item",
+        quantity: 0,
         revenue: 0
       };
-      current.qtySold += Number(i.qty || 0);
+      current.quantity += Number(i.qty || 0);
       current.revenue += Number(i.lineTotal || 0);
       itemMap.set(key, current);
     });
@@ -46,15 +51,21 @@ function getSummary(rangeInput) {
 
   return {
     sales: {
-      total: totalSales,
-      averageOrderValue: filtered.length ? totalSales / filtered.length : 0,
-      range
+      today: todaySales,
+      rangeTotal: totalSales,
+      averageOrderValue: filtered.length ? totalSales / filtered.length : 0
     },
     orders: {
-      total: filtered.length,
-      byStatus: ordersByStatus
+      today: todayOrders.length,
+      rangeTotal: filtered.length,
+      pending: Number(ordersByStatus.pending || 0),
+      preparing: Number(ordersByStatus.preparing || 0),
+      ready: Number(ordersByStatus.ready || 0),
+      outForDelivery: Number(ordersByStatus.out_for_delivery || ordersByStatus.outForDelivery || 0),
+      completed: Number(ordersByStatus.completed || 0),
+      cancelled: Number(ordersByStatus.cancelled || 0)
     },
-    topItems: [...itemMap.values()].sort((a, b) => b.qtySold - a.qtySold).slice(0, 10),
+    topItems: [...itemMap.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 10),
     recentOrders: filtered.slice(0, 10),
     alerts: []
   };
