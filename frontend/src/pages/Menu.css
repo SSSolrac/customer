@@ -6,6 +6,7 @@
 .featured-card img { width:100%; aspect-ratio: 1.15; object-fit:cover; border-radius:10px; }
 .featured-card h3 { margin:10px 0 4px; font-size:1rem; }
 .featured-card p { margin:0; color:#666; }
+.menu-discount-tag { display:inline-block; margin-top:8px !important; font-size:.78rem; font-weight:700; color:#9c2155 !important; background:#ffe5ef; border-radius:999px; padding:4px 9px; }
 .sold-out,.available { display:inline-block; margin-top:8px; font-size:.8rem; padding:3px 9px; border-radius:999px; font-weight:600; }
 .sold-out { background:#fff1f5; color:#bf2456; }
 .available { background:#e8f9f3; color:#27835b; }

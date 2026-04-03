@@ -144,6 +144,16 @@
   font-weight: 900;
   white-space: nowrap;
 }
+.item-discount-badge {
+  margin: 0;
+  width: fit-content;
+  font-size: .8rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #9c2155;
+  background: #ffe5ef;
+}
 
 .add-btn {
   border: none;

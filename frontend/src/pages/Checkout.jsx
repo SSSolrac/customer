@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
 import { createOrder, validateCheckout } from "../services/orderService";
 import { getCustomerProfile, saveCustomerProfile } from "../services/profileService";
+import { syncCustomerNotifications } from "../services/notificationService";
 import { labelToCanonicalOrderType } from "../constants/canonical";
 import { PAYMENT_METHOD_OPTIONS, getPaymentQrAsset, paymentMethodToLabel } from "../utils/paymentMethods";
 import "./Checkout.css";
@@ -58,6 +59,7 @@ export default function Checkout() {
   }, [receiptPreviewUrl]);
 
   const canonicalOrderType = labelToCanonicalOrderType(form.orderType);
+  const isAddressValid = Boolean(form.address.trim());
 
   const payload = useMemo(
     () => ({
@@ -150,6 +152,7 @@ export default function Checkout() {
       });
 
       await createOrder(payloadWithReceipt);
+      await syncCustomerNotifications();
       clearCart();
       removeReceipt();
       navigate("/order-success");
@@ -201,12 +204,16 @@ export default function Checkout() {
           </select>
 
           {canonicalOrderType === "delivery" ? (
-            <>
-              <label>Delivery Address</label>
-              <input value={form.address} onChange={(e) => handleFieldChange("address", e.target.value)} />
-              {errors.address ? <p className="field-error">{errors.address}</p> : null}
-            </>
-          ) : null}
+            <label>Delivery Address</label>
+          ) : (
+            <label>Address for receipt & support</label>
+          )}
+          <input
+            value={form.address}
+            onChange={(e) => handleFieldChange("address", e.target.value)}
+            placeholder="House/Unit, Street, Barangay, City"
+          />
+          {errors.address ? <p className="field-error">{errors.address}</p> : null}
 
           <label>Payment</label>
           <select value={form.paymentMethod} onChange={(e) => handleFieldChange("paymentMethod", e.target.value)}>
@@ -243,7 +250,8 @@ export default function Checkout() {
           {errors.form ? <p className="field-error">{errors.form}</p> : null}
           {errors.items ? <p className="field-error">{errors.items}</p> : null}
 
-          <button className="checkout-submit" type="submit" disabled={isSubmitting}>
+          {!isAddressValid ? <p className="field-error">Address is required before payment.</p> : null}
+          <button className="checkout-submit" type="submit" disabled={isSubmitting || !isAddressValid}>
             {isSubmitting ? "Placing order..." : "Place Order"}
           </button>
         </form>

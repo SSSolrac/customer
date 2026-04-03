@@ -1,9 +1,17 @@
 import { ApiError, isApiAvailableError, requestJson } from "./api";
 import { getScopedStorageKey, getSessionCustomerId } from "./sessionService";
-import { canonicalOrderTypeToLabel, canonicalPaymentMethodToLabel, canonicalStatusToLabel, labelToCanonicalOrderType, labelToCanonicalPaymentMethod } from "../constants/canonical";
+import {
+  canonicalOrderTypeToLabel,
+  canonicalPaymentMethodToLabel,
+  canonicalStatusToLabel,
+  labelToCanonicalOrderType,
+  labelToCanonicalPaymentMethod
+} from "../constants/canonical";
 
 const ORDER_STORE_KEY = "happyTailsOrders_v3";
 const LATEST_ORDER_KEY = "happyTailsLatestOrder_v3";
+const CANCELLATION_WINDOW_MS = 5 * 60 * 1000;
+const TERMINAL_STATUSES = new Set(["cancelled", "completed", "delivered", "refunded"]);
 
 const STATUS_STEPS_BY_ORDER_TYPE = {
   delivery: ["pending", "preparing", "ready", "out_for_delivery", "delivered"],
@@ -60,8 +68,10 @@ function normalizeOrder(order) {
     : [];
 
   const timeline = Array.isArray(order.statusTimeline)
-    ? order.statusTimeline.map((entry) => ({ status: String(entry.status || "").toLowerCase(), at: entry.at }))
+    ? order.statusTimeline.map((entry) => ({ status: String(entry.status || "").toLowerCase(), at: entry.at || entry.changedAt }))
     : [];
+
+  const paidAt = order.paidAt || (String(order.paymentStatus || "").toLowerCase() === "paid" ? order.updatedAt || order.createdAt : null);
 
   return {
     ...order,
@@ -72,6 +82,8 @@ function normalizeOrder(order) {
     statusLabel: canonicalStatusToLabel(status),
     paymentMethod: labelToCanonicalPaymentMethod(order.paymentMethod || "qrph"),
     paymentMethodLabel: canonicalPaymentMethodToLabel(order.paymentMethod || "qrph"),
+    paymentStatus: String(order.paymentStatus || "pending").toLowerCase(),
+    paidAt,
     items,
     statusTimeline: timeline,
     total: Number(order.total || 0)
@@ -90,6 +102,26 @@ function getOrderQuery(customerId = getSessionCustomerId()) {
   return `?customerId=${encodeURIComponent(customerId)}`;
 }
 
+function updateOrderInCache(orderId, updater, customerId = getSessionCustomerId()) {
+  const orders = readOrders(customerId);
+  let updatedOrder = null;
+  const next = orders.map((item) => {
+    if (item.id !== orderId && item.orderNumber !== orderId) return item;
+    updatedOrder = updater(item);
+    return updatedOrder;
+  });
+
+  if (updatedOrder) {
+    writeOrders(next, customerId);
+    if (updatedOrder.id) {
+      const { latestKey } = getCustomerScopedKeys(customerId);
+      localStorage.setItem(latestKey, updatedOrder.id);
+    }
+  }
+
+  return updatedOrder;
+}
+
 export function getStatusSteps(orderType) {
   return STATUS_STEPS_BY_ORDER_TYPE[toCanonicalOrderType(orderType)] || STATUS_STEPS_BY_ORDER_TYPE.takeout;
 }
@@ -98,14 +130,53 @@ export function getStatusLabel(status) {
   return canonicalStatusToLabel(status);
 }
 
+export function formatRemainingCancellationTime(remainingSeconds) {
+  const safeSeconds = Math.max(0, Number(remainingSeconds || 0));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+export function getOrderCancellationState(order, now = Date.now()) {
+  if (!order) return { canCancel: false, reason: "Order not found." };
+
+  const status = String(order.status || "").toLowerCase();
+  if (status === "cancelled") return { canCancel: false, reason: "Order is already cancelled." };
+  if (TERMINAL_STATUSES.has(status)) return { canCancel: false, reason: `Order is already ${getStatusLabel(status).toLowerCase()}.` };
+
+  const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+  if (paymentStatus !== "paid") return { canCancel: false, reason: "Order can be cancelled only after payment is confirmed." };
+
+  const paidAtMs = toMs(order.paidAt || order.updatedAt || order.createdAt);
+  if (!paidAtMs) return { canCancel: false, reason: "Payment timestamp unavailable." };
+
+  const expiresAtMs = paidAtMs + CANCELLATION_WINDOW_MS;
+  const remainingMs = expiresAtMs - now;
+
+  if (remainingMs <= 0) {
+    return {
+      canCancel: false,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      remainingSeconds: 0,
+      reason: "Cancellation window expired."
+    };
+  }
+
+  return {
+    canCancel: true,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    remainingSeconds: Math.ceil(remainingMs / 1000)
+  };
+}
+
 export async function validateCheckout(orderPayload) {
   const errors = {};
 
   if (!orderPayload.items?.length) errors.items = "Your cart is empty.";
   if (!orderPayload.customer?.name?.trim()) errors.name = "Name is required.";
   if (!orderPayload.customer?.phone?.trim()) errors.phone = "Phone number is required.";
-  if (toCanonicalOrderType(orderPayload.orderType) === "delivery" && !orderPayload.customer?.address?.trim()) {
-    errors.address = "Delivery address is required for delivery orders.";
+  if (!orderPayload.customer?.address?.trim()) {
+    errors.address = "Delivery address is required before payment.";
   }
 
   const paymentMethod = labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment);
@@ -121,6 +192,8 @@ export async function validateCheckout(orderPayload) {
 }
 
 function toCanonicalCreatePayload(orderPayload) {
+  const paidAt = new Date().toISOString();
+
   return {
     customerId: orderPayload.customerId || getSessionCustomerId(),
     customerName: orderPayload.customer?.name || "",
@@ -129,7 +202,8 @@ function toCanonicalCreatePayload(orderPayload) {
     customerAddress: orderPayload.customer?.address || "",
     orderType: toCanonicalOrderType(orderPayload.orderType),
     paymentMethod: labelToCanonicalPaymentMethod(orderPayload.paymentMethod || orderPayload.payment || "qrph"),
-    paymentStatus: "pending",
+    paymentStatus: "paid",
+    paidAt,
     serviceFee: 0,
     discount: 0,
     subtotal: Number(orderPayload.total || 0),
@@ -154,13 +228,34 @@ export async function createOrder(orderPayload) {
     throw error;
   }
 
+  const canonicalPayload = toCanonicalCreatePayload(orderPayload);
   const response = await requestJson("/orders", {
     method: "POST",
-    body: toCanonicalCreatePayload(orderPayload)
+    body: canonicalPayload
   });
-  const order = normalizeOrder(response.order);
+  const order = normalizeOrder({ ...response.order, paidAt: response.order?.paidAt || canonicalPayload.paidAt, paymentStatus: "paid" });
   cacheOrder(order, order.customerId);
   return order;
+}
+
+export async function cancelOrder(order, note = "Cancelled by customer within allowed window") {
+  const customerId = getSessionCustomerId();
+  const existingOrder = typeof order === "string" ? await getOrderById(order) : order;
+  if (!existingOrder) throw new Error("Order not found.");
+
+  const cancellationState = getOrderCancellationState(existingOrder);
+  if (!cancellationState.canCancel) {
+    throw new Error(cancellationState.reason || "Cancellation is no longer allowed.");
+  }
+
+  const response = await requestJson(`/orders/${encodeURIComponent(existingOrder.id)}/status${getOrderQuery(customerId)}`, {
+    method: "PATCH",
+    body: { status: "cancelled", note }
+  });
+
+  const updatedOrder = normalizeOrder(response.order);
+  cacheOrder(updatedOrder, customerId);
+  return updatedOrder;
 }
 
 export async function getLatestOrder() {
@@ -218,4 +313,9 @@ export async function getOrderStatusHistory(orderId) {
   const customerId = getSessionCustomerId();
   const response = await requestJson(`/orders/${encodeURIComponent(orderId)}/history${getOrderQuery(customerId)}`);
   return Array.isArray(response.history) ? response.history.map((entry) => ({ ...entry, status: String(entry.status || "").toLowerCase() })) : [];
+}
+
+export function syncCachedOrderPaidAt(orderId, paidAt) {
+  if (!orderId || !paidAt) return null;
+  return updateOrderInCache(orderId, (item) => ({ ...item, paidAt, paymentStatus: "paid" }));
 }

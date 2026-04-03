@@ -1,13 +1,35 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
 import profileIcon from "../assets/profile.png";
 import "./Navbar.css";
 import { useCart } from "../context/CartContext";
 import { useSession } from "../context/SessionContext";
+import { getUnreadNotificationCount, syncCustomerNotifications } from "../services/notificationService";
 
 function Navbar({ onSignOut, onOpenModal }) {
   const { cartCount } = useCart();
   const { isAuthenticated, isGuest, user } = useSession();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated && !isGuest) {
+      return;
+    }
+
+    const loadNotifications = async () => {
+      try {
+        await syncCustomerNotifications();
+      } catch {
+        // silent fallback to cached count
+      }
+      setUnreadCount(getUnreadNotificationCount());
+    };
+
+    loadNotifications();
+  }, [isAuthenticated, isGuest]);
+
+  const visibleUnreadCount = (isAuthenticated || isGuest) ? unreadCount : 0;
 
   return (
     <nav className="navbar" style={{ backgroundColor: "#ffffff" }}>
@@ -29,6 +51,13 @@ function Navbar({ onSignOut, onOpenModal }) {
       </ul>
 
       <div className="nav-right">
+        {(isAuthenticated || isGuest) ? (
+          <Link to="/notifications" className="cart-link" aria-label="Notifications">
+            <span className="basket-icon">🔔</span>
+            {visibleUnreadCount > 0 && <span className="cart-badge">{visibleUnreadCount > 99 ? "99+" : visibleUnreadCount}</span>}
+          </Link>
+        ) : null}
+
         <Link to="/cart" className="cart-link" aria-label="Basket">
           <span className="basket-icon">🧺</span>
           {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
