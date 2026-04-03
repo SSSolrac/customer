@@ -19,7 +19,7 @@ function login(payload) {
 
   return {
     id: profile?.id || makeId("user"),
-    name: profile?.name || payload.name || email.split("@")[0] || "User",
+    name: profile?.fullName || payload.name || email.split("@")[0] || "User",
     email,
     role
   };

@@ -52,9 +52,11 @@ export async function getCustomerProfile() {
 
   try {
     const response = await requestJson(`/profile/me${getQuery(customerId)}`);
-    const normalized = normalizeProfile(unwrapData(response, null), customerId);
-    localStorage.setItem(getProfileKey(customerId), JSON.stringify(normalized));
-    return normalized;
+    const profile = unwrapData(response, null);
+    if (profile) {
+      localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
+      return profile;
+    }
   } catch (error) {
     if (!isApiAvailableError(error)) {
       // fallback for uninitialized server profile data
@@ -69,10 +71,12 @@ export async function saveCustomerProfile(profile) {
   const normalized = normalizeProfile(profile, customerId);
 
   try {
-    const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: normalized });
-    const saved = normalizeProfile(unwrapData(response, null), customerId);
-    localStorage.setItem(getProfileKey(customerId), JSON.stringify(saved));
-    return saved;
+    const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: profile });
+    const profile = unwrapData(response, null);
+    if (profile) {
+      localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
+      return profile;
+    }
   } catch (error) {
     if (!isApiAvailableError(error)) {
       // fallback for offline/demo behavior

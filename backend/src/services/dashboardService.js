@@ -12,49 +12,50 @@ function daysFromRange(range) {
   return 1;
 }
 
-function isInDays(order, days) {
-  return Date.now() - new Date(order.createdAt).getTime() <= days * 24 * 60 * 60 * 1000;
-}
-
 function getSummary(rangeInput) {
   const range = parseRange(rangeInput);
-  const allOrders = orderService.listOrders();
-  const todayOrders = allOrders.filter((o) => isInDays(o, 1));
-  const rangeOrders = allOrders.filter((o) => isInDays(o, daysFromRange(range)));
+  const orders = orderService.listOrders();
+  const now = Date.now();
+  const days = daysFromRange(range);
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
 
-  const sumTotal = (orders) => orders.reduce((acc, o) => acc + Number(o.total || 0), 0);
+  const filtered = orders.filter((o) => new Date(o.createdAt).getTime() >= cutoff);
+  const totalSales = filtered.reduce((acc, o) => acc + Number(o.total || 0), 0);
 
-  const topMap = new Map();
-  rangeOrders.forEach((o) => {
+  const ordersByStatus = filtered.reduce((acc, o) => {
+    const key = o.status || "pending";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const itemMap = new Map();
+  filtered.forEach((o) => {
     (o.items || []).forEach((i) => {
       const key = i.menuItemId || i.itemName;
-      const row = topMap.get(key) || { itemName: i.itemName || "Item", quantity: 0, revenue: 0 };
-      row.quantity += Number(i.qty || 0);
-      row.revenue += Number(i.lineTotal || 0);
-      topMap.set(key, row);
+      const current = itemMap.get(key) || {
+        menuItemId: i.menuItemId || null,
+        name: i.itemName || "Item",
+        qtySold: 0,
+        revenue: 0
+      };
+      current.qtySold += Number(i.qty || 0);
+      current.revenue += Number(i.lineTotal || 0);
+      itemMap.set(key, current);
     });
   });
 
-  const countStatus = (status) => rangeOrders.filter((o) => o.status === status).length;
-
   return {
     sales: {
-      today: sumTotal(todayOrders),
-      rangeTotal: sumTotal(rangeOrders),
-      averageOrderValue: rangeOrders.length ? sumTotal(rangeOrders) / rangeOrders.length : 0
+      total: totalSales,
+      averageOrderValue: filtered.length ? totalSales / filtered.length : 0,
+      range
     },
     orders: {
-      today: todayOrders.length,
-      rangeTotal: rangeOrders.length,
-      pending: countStatus("pending"),
-      preparing: countStatus("preparing"),
-      ready: countStatus("ready"),
-      outForDelivery: countStatus("out_for_delivery"),
-      completed: countStatus("completed") + countStatus("delivered"),
-      cancelled: countStatus("cancelled") + countStatus("refunded")
+      total: filtered.length,
+      byStatus: ordersByStatus
     },
-    topItems: [...topMap.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 10),
-    recentOrders: rangeOrders.slice(0, 10),
+    topItems: [...itemMap.values()].sort((a, b) => b.qtySold - a.qtySold).slice(0, 10),
+    recentOrders: filtered.slice(0, 10),
     alerts: []
   };
 }
