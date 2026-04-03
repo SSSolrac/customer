@@ -32,13 +32,12 @@ function Profile() {
         const profile = await getCustomerProfile();
         const mergedProfile = {
           ...blankProfile,
-          name: user?.fullName || "",
           email: user?.email || "",
           ...profile
         };
         setFormData(mergedProfile);
 
-        const data = await getCustomerLoyaltyData(mergedProfile.name);
+        const data = await getCustomerLoyaltyData();
         setLoyaltyData(data);
       } catch {
         setError("We couldn't load your account details right now.");
@@ -48,7 +47,7 @@ function Profile() {
     };
 
     loadProfile();
-  }, [user?.email, user?.fullName]);
+  }, [user?.email]);
 
   const handleChange = (event) => {
     setFormData({ ...formData, [event.target.name]: event.target.value });
@@ -73,7 +72,7 @@ function Profile() {
     try {
       await saveCustomerProfile(formData);
       setMessage("Profile saved. Checkout will use your latest details automatically.");
-      const data = await getCustomerLoyaltyData(formData.name);
+      const data = await getCustomerLoyaltyData();
       setLoyaltyData(data);
     } catch {
       setError("Unable to save right now. Please try again.");

@@ -2,14 +2,13 @@ const profileRepository = require("../repositories/profileRepository");
 
 function buildDefaultProfile(customerId, existing = null) {
   const now = new Date().toISOString();
-  const baseAddress = existing?.address || "";
 
   return {
     id: customerId,
-    name: existing?.name || existing?.fullName || "",
+    name: existing?.name || "",
     email: existing?.email || "",
     phone: existing?.phone || "",
-    addresses: Array.isArray(existing?.addresses) ? existing.addresses : (baseAddress ? [baseAddress] : []),
+    addresses: Array.isArray(existing?.addresses) ? existing.addresses : [],
     preferences: existing?.preferences && typeof existing.preferences === "object" ? existing.preferences : {},
     createdAt: existing?.createdAt || now,
     updatedAt: existing?.updatedAt || now
@@ -32,12 +31,10 @@ function upsertProfile(customerId, payload) {
 
   const profile = {
     ...current,
-    name: payload.name ?? payload.fullName ?? current.name,
+    name: payload.name ?? current.name,
     email: payload.email ?? current.email,
     phone: payload.phone ?? current.phone,
-    addresses: Array.isArray(payload.addresses)
-      ? payload.addresses
-      : (payload.address ? [payload.address] : current.addresses),
+    addresses: Array.isArray(payload.addresses) ? payload.addresses : current.addresses,
     preferences: payload.preferences && typeof payload.preferences === "object"
       ? payload.preferences
       : current.preferences,

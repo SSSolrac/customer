@@ -35,15 +35,16 @@ function getQuery(customerId = getSessionCustomerId()) {
 
 function normalizeProfile(profile, customerId = getSessionCustomerId()) {
   const safe = profile || {};
+  const now = new Date().toISOString();
   return {
     id: safe.id || customerId,
-    name: safe.name || safe.fullName || "",
+    name: safe.name || "",
     email: safe.email || "",
     phone: safe.phone || "",
-    addresses: Array.isArray(safe.addresses) ? safe.addresses : (safe.address ? [safe.address] : []),
+    addresses: Array.isArray(safe.addresses) ? safe.addresses : [],
     preferences: safe.preferences && typeof safe.preferences === "object" ? safe.preferences : {},
-    createdAt: safe.createdAt || new Date().toISOString(),
-    updatedAt: safe.updatedAt || new Date().toISOString()
+    createdAt: safe.createdAt || now,
+    updatedAt: safe.updatedAt || now
   };
 }
 
@@ -52,7 +53,7 @@ export async function getCustomerProfile() {
 
   try {
     const response = await requestJson(`/profile/me${getQuery(customerId)}`);
-    const profile = unwrapData(response, null);
+    const profile = normalizeProfile(unwrapData(response, null), customerId);
     if (profile) {
       localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
       return profile;
@@ -71,11 +72,11 @@ export async function saveCustomerProfile(profile) {
   const normalized = normalizeProfile(profile, customerId);
 
   try {
-    const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: profile });
-    const profile = unwrapData(response, null);
-    if (profile) {
-      localStorage.setItem(getProfileKey(customerId), JSON.stringify(profile));
-      return profile;
+    const response = await requestJson(`/profile/me${getQuery(customerId)}`, { method: "PUT", body: normalized });
+    const savedProfile = normalizeProfile(unwrapData(response, null), customerId);
+    if (savedProfile) {
+      localStorage.setItem(getProfileKey(customerId), JSON.stringify(savedProfile));
+      return savedProfile;
     }
   } catch (error) {
     if (!isApiAvailableError(error)) {

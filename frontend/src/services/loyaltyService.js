@@ -1,27 +1,24 @@
 import { requestJson, unwrapData } from "./api";
 import { getSessionCustomerId } from "./sessionService";
 
-export async function getCustomerLoyaltyData(customerName = "") {
+function normalizeReward(reward) {
+  return {
+    id: String(reward?.id || ""),
+    label: String(reward?.label || ""),
+    requiredStamps: Number(reward?.requiredStamps || 0)
+  };
+}
+
+export async function getCustomerLoyaltyData() {
   const customerId = getSessionCustomerId();
   const response = await requestJson(`/loyalty/${encodeURIComponent(customerId)}`);
   const loyalty = unwrapData(response, {}) || {};
 
-  const stampCount = Number(loyalty.stampCount || 0);
-  const availableRewards = Array.isArray(loyalty.availableRewards) ? loyalty.availableRewards : [];
-
   return {
-    customerId,
-    customerName,
-    totalStamps: TOTAL_STAMPS,
-    rewardMilestones: LOYALTY_MILESTONES,
-    stampCount,
-    availableRewards,
-    redeemedRewards: Array.isArray(loyalty.redeemedRewards) ? loyalty.redeemedRewards : [],
-    // Backward-safe UI aliases
-    currentStampCount: stampCount,
-    totalStampsEarned: stampCount,
-    rewardsUnlocked: availableRewards.map((reward) => reward.label),
-    updatedAt: loyalty.updatedAt || null,
-    recentActivity: []
+    customerId: String(loyalty.customerId || customerId),
+    stampCount: Number(loyalty.stampCount || 0),
+    availableRewards: (Array.isArray(loyalty.availableRewards) ? loyalty.availableRewards : []).map(normalizeReward),
+    redeemedRewards: (Array.isArray(loyalty.redeemedRewards) ? loyalty.redeemedRewards : []).map(normalizeReward),
+    updatedAt: String(loyalty.updatedAt || "")
   };
 }
