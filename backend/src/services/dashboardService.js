@@ -38,6 +38,7 @@ function getSummary(rangeInput) {
     (o.items || []).forEach((i) => {
       const key = i.menuItemId || i.itemName;
       const current = itemMap.get(key) || {
+        menuItemId: i.menuItemId || null,
         itemName: i.itemName || "Item",
         quantity: 0,
         revenue: 0
