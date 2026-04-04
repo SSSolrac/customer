@@ -20,6 +20,7 @@ import TrackOrder from "./pages/TrackOrder";
 import Notifications from "./pages/Notifications";
 import pattern from "./assets/pattern.png";
 import { useSession } from "./context/SessionContext";
+import { createLoginHistory, login as loginRequest, logout as logoutRequest } from "./services/authService";
 
 function ProtectedRoute({ children }) {
   const { canAccessAccount } = useSession();
@@ -52,8 +53,19 @@ function App() {
     };
   }, [location.pathname]);
 
-  const handleLogin = (credentials) => {
-    signIn(credentials);
+  const handleLogin = async (credentials) => {
+    const user = await loginRequest({ email: credentials.email, password: credentials.password, role: credentials.role });
+    if (!user) throw new Error("Invalid credentials.");
+
+    signIn({
+      id: user.id,
+      email: user.email,
+      fullName: user.name || credentials.fullName,
+      role: user.role,
+      customerCode: user.customerCode
+    });
+
+    await createLoginHistory({ id: user.id, name: user.name, email: user.email, role: user.role, loginStatus: "success" });
     setShowModal(false);
   };
 
@@ -63,6 +75,16 @@ function App() {
     navigate("/order");
   };
 
+  const handleSignOut = async () => {
+    try {
+      if (isAuthenticated) await logoutRequest({ loginStatus: "logout" });
+    } catch {
+      // best effort API logging
+    }
+    signOut();
+    navigate("/");
+  };
+
   const handleOrderClick = () => {
     if (!isAuthenticated && !isGuest) setShowModal(true);
     else navigate("/order");
@@ -70,7 +92,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Navbar onSignOut={signOut} onOpenModal={() => setShowModal(true)} />
+      <Navbar onSignOut={handleSignOut} onOpenModal={() => setShowModal(true)} />
 
       <main className="app-main">
         <Routes>
