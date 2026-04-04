@@ -12,7 +12,8 @@ function toCanonicalOrderItem(item, orderId) {
   return {
     id: item.id || makeId("order_item"),
     orderId,
-    menuItemId: item.menuItemId || item.menuId || null,
+    menuItemId: item.menuItemId || item.menuId || item.id || null,
+    menuItemCode: item.menuItemCode || item.itemCode || null,
     itemName: item.itemName || item.name || item.title || "Item",
     qty,
     unitPrice,

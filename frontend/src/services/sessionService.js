@@ -6,15 +6,18 @@ function sanitizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function createUserIdentity({ id, email, fullName, status = "authenticated" } = {}) {
+export function createUserIdentity({ id, email, fullName, role = "customer", status = "authenticated", customerCode } = {}) {
   const cleanEmail = sanitizeText(email).toLowerCase();
   const cleanName = sanitizeText(fullName);
+  const normalizedRole = ["owner", "staff", "customer"].includes(role) ? role : "customer";
 
   if (status === "guest") {
     return {
       id: "guest",
       email: "",
-      fullName: cleanName || "Guest"
+      fullName: cleanName || "Guest",
+      role: "customer",
+      customerCode: null
     };
   }
 
@@ -23,7 +26,9 @@ export function createUserIdentity({ id, email, fullName, status = "authenticate
   return {
     id: normalizedId,
     email: cleanEmail,
-    fullName: cleanName || DEFAULT_AUTH_NAME
+    fullName: cleanName || DEFAULT_AUTH_NAME,
+    role: normalizedRole,
+    customerCode: customerCode || null
   };
 }
 
@@ -61,4 +66,10 @@ export function getSessionStorageKey() {
 
 export function getScopedStorageKey(baseKey, customerId) {
   return `${baseKey}:${customerId || "guest"}`;
+}
+
+export function clearAllSessionData() {
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith("happyTails")) localStorage.removeItem(key);
+  });
 }

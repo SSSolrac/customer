@@ -1,10 +1,20 @@
 const profileRepository = require("../repositories/profileRepository");
+const { nextCode, ensureCounterAtLeast } = require("../utils/codeGenerator");
+
+function extractCounterFromCode(code, prefix) {
+  const value = String(code || "").trim();
+  if (!value.startsWith(`${prefix}-`)) return 0;
+  return Number(value.split("-")[1] || 0);
+}
 
 function buildDefaultProfile(customerId, existing = null) {
   const now = new Date().toISOString();
+  const existingCode = existing?.customerCode || null;
+  if (existingCode) ensureCounterAtLeast("customerCode", extractCounterFromCode(existingCode, "HTC"));
 
   return {
     id: customerId,
+    customerCode: existingCode || nextCode("customerCode", "HTC"),
     name: existing?.name || "",
     email: existing?.email || "",
     phone: existing?.phone || "",

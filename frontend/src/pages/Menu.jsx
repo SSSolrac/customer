@@ -3,7 +3,7 @@ import menu1 from "../assets/menu1.JPG";
 import menu2 from "../assets/menu2.JPG";
 import MenuOfTheDay from "../components/dailyMenu/MenuOfTheDay";
 import { MENU } from "../data/menuData";
-import { getCurrentDailyMenu } from "../services/dailyMenuService";
+import { getCurrentDailyMenu, getMenuCatalog } from "../services/dailyMenuService";
 import { useEffect, useMemo, useState } from "react";
 import "./Menu.css";
 
@@ -13,14 +13,16 @@ function Menu() {
   const [dailyMenu, setDailyMenu] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [catalogItems, setCatalogItems] = useState([]);
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       setError("");
       try {
-        const data = await getCurrentDailyMenu();
+        const [data, catalog] = await Promise.all([getCurrentDailyMenu(), getMenuCatalog()]);
         setDailyMenu(data);
+        setCatalogItems(catalog);
       } catch {
         setError("Could not load today's featured menu right now.");
       } finally {
@@ -32,8 +34,18 @@ function Menu() {
   }, []);
 
   const featuredItems = useMemo(() => {
-    const allItems = Object.values(MENU).flatMap((category) => category.items);
+    if (catalogItems.length) {
+      return catalogItems.slice(0, 6).map((item) => ({
+        id: item.id,
+        image: item.imageUrl || menu1,
+        name: `${item.code || ""} ${item.name || ""}`.trim(),
+        price: Number(item.price || 0) - Number(item.discount || 0),
+        discountAmount: Number(item.discount || 0),
+        availability: item.isAvailable === false ? "Unavailable" : "Available"
+      }));
+    }
 
+    const allItems = Object.values(MENU).flatMap((category) => category.items);
     const matched = allItems.filter((item) => FEATURED_KEYWORDS.some((keyword) => item.name.includes(keyword)));
     const fallback = allItems.filter((item) => item.price >= 130 && item.price <= 170);
 
@@ -41,7 +53,7 @@ function Menu() {
       ...item,
       availability: item.price > 175 ? "Limited" : "Available"
     }));
-  }, []);
+  }, [catalogItems]);
 
   return (
     <div className="menu-page">
@@ -57,7 +69,7 @@ function Menu() {
             <img src={item.image} alt={item.name} />
             <h3>{item.name}</h3>
             <p>₱{item.price}</p>
-            {item.discountPercent ? <p className="menu-discount-tag">{item.discountPercent}% OFF</p> : null}
+            {item.discountAmount ? <p className="menu-discount-tag">₱{item.discountAmount} OFF</p> : null}
             <span className={item.availability === "Available" ? "available" : "sold-out"}>{item.availability}</span>
           </article>
         ))}

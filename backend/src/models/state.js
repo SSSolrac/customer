@@ -5,5 +5,14 @@ module.exports = {
   menuCategories: [],
   menuItems: [],
   dailyMenus: [],
-  loginHistory: []
+  loginHistory: [],
+  importedSales: [],
+  importHistory: [],
+  ingredients: [],
+  recipeLines: [],
+  counters: {
+    customerCode: 0,
+    menuItemCode: 0,
+    ingredientCode: 0
+  }
 };

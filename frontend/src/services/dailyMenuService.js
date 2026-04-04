@@ -17,10 +17,28 @@ function deriveDailyPicksFallback() {
   return Object.entries(grouped).map(([name, items]) => ({ name, items }));
 }
 
+function normalizeDailyMenu(raw) {
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+  const grouped = items.reduce((acc, item) => {
+    const groupName = item.categoryId || "Featured";
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(item.displayName || `${item.code || ""} ${item.name || ""}`.trim());
+    return acc;
+  }, {});
+
+  return {
+    title: "Menu of the Day",
+    subtitle: raw?.isPublished ? "Fresh picks selected by our kitchen" : "Chef picks are being prepared",
+    date: raw?.menuDate || new Date().toISOString().split("T")[0],
+    isActive: Boolean(raw?.isPublished),
+    categories: Object.entries(grouped).map(([name, groupItems]) => ({ name, items: groupItems }))
+  };
+}
+
 export async function getCurrentDailyMenu() {
   try {
     const response = await requestJson("/menu/daily");
-    return unwrapData(response, null) || response;
+    return normalizeDailyMenu(unwrapData(response, null) || response);
   } catch {
     const categories = deriveDailyPicksFallback();
     return {

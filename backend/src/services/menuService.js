@@ -1,13 +1,53 @@
 const menuRepository = require("../repositories/menuRepository");
+const inventoryRepository = require("../repositories/inventoryRepository");
 const { makeId } = require("../utils/id");
+const { nextCode, ensureCounterAtLeast } = require("../utils/codeGenerator");
+
+function counterFromCode(code, prefix) {
+  const value = String(code || "").trim();
+  if (!value.startsWith(`${prefix}-`)) return 0;
+  return Number(value.split("-")[1] || 0);
+}
+
+function getIngredientAvailability(menuItemId) {
+  const recipeLines = inventoryRepository.listRecipeLines().filter((line) => line.menuItemId === menuItemId);
+  if (!recipeLines.length) {
+    return { ingredientSufficient: true, missingIngredients: [] };
+  }
+
+  const missingIngredients = recipeLines
+    .map((line) => {
+      const ingredient = inventoryRepository.getIngredientById(line.ingredientId);
+      const required = Number(line.quantityRequired || 0);
+      const inStock = Number(ingredient?.stockOnHand || 0);
+      if (!ingredient || !ingredient.isActive || inStock < required) {
+        return {
+          ingredientId: line.ingredientId,
+          ingredientCode: ingredient?.code || null,
+          ingredientName: ingredient?.name || "Unknown",
+          required,
+          inStock
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  return {
+    ingredientSufficient: missingIngredients.length === 0,
+    missingIngredients
+  };
+}
 
 function withInventoryStatus(item) {
-  const stock = Number(item.stock || 0);
-  const threshold = Number(item.lowStockThreshold || 0);
-  let inventoryStatus = "in_stock";
-  if (stock <= 0) inventoryStatus = "out_of_stock";
-  else if (stock <= threshold) inventoryStatus = "low_stock";
-  return { ...item, inventoryStatus };
+  ensureCounterAtLeast("menuItemCode", counterFromCode(item.code, "MI"));
+  const ingredientAvailability = getIngredientAvailability(item.id);
+  return {
+    ...item,
+    isAvailable: Boolean(item.manualAvailability ?? item.isAvailable ?? true) && ingredientAvailability.ingredientSufficient,
+    manualAvailability: Boolean(item.manualAvailability ?? item.isAvailable ?? true),
+    ingredientAvailability
+  };
 }
 
 function getMenu() {
@@ -18,14 +58,14 @@ function createMenuItem(payload) {
   const now = new Date().toISOString();
   const item = {
     id: makeId("menu_item"),
+    code: nextCode("menuItemCode", "MI"),
     categoryId: payload.categoryId || "",
     name: payload.name || "",
     description: payload.description || "",
     price: Number(payload.price || 0),
     isAvailable: payload.isAvailable ?? true,
+    manualAvailability: payload.manualAvailability ?? payload.isAvailable ?? true,
     imageUrl: payload.imageUrl || null,
-    stock: Number(payload.stock || 0),
-    lowStockThreshold: Number(payload.lowStockThreshold || 0),
     discount: Number(payload.discount || 0),
     createdAt: now,
     updatedAt: now
@@ -37,9 +77,8 @@ function updateMenuItem(menuItemId, payload) {
   const item = menuRepository.updateItem(menuItemId, {
     ...payload,
     ...(payload.price !== undefined ? { price: Number(payload.price) } : {}),
-    ...(payload.stock !== undefined ? { stock: Number(payload.stock) } : {}),
-    ...(payload.lowStockThreshold !== undefined ? { lowStockThreshold: Number(payload.lowStockThreshold) } : {}),
     ...(payload.discount !== undefined ? { discount: Number(payload.discount) } : {}),
+    ...(payload.isAvailable !== undefined ? { manualAvailability: Boolean(payload.isAvailable), isAvailable: Boolean(payload.isAvailable) } : {}),
     updatedAt: new Date().toISOString()
   });
   return item ? withInventoryStatus(item) : null;
@@ -54,7 +93,9 @@ function toDailyMenuItem(item) {
   return {
     id: item.id || makeId("daily_menu_item"),
     menuItemId: item.menuItemId,
+    code: item.code || menuItem?.code || null,
     name: item.name || menuItem?.name || "",
+    displayName: `${item.code || menuItem?.code || "MI-?????"} - ${item.name || menuItem?.name || ""}`.trim(),
     price: Number(item.price ?? menuItem?.price ?? 0),
     categoryId: item.categoryId || menuItem?.categoryId || "",
     isAvailable: item.isAvailable ?? menuItem?.isAvailable ?? true
