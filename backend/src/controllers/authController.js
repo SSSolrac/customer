@@ -6,6 +6,11 @@ function login(req, res) {
   return res.json({ data: user });
 }
 
+function logout(req, res) {
+  authService.logLoginHistory({ ...(req.body || {}), loginStatus: "logout", logoutTime: new Date().toISOString() });
+  return res.status(204).send();
+}
+
 function postLoginHistory(req, res) {
   const saved = authService.logLoginHistory(req.body || {});
   return res.status(201).json({ data: saved });
@@ -13,11 +18,11 @@ function postLoginHistory(req, res) {
 
 function getLoginHistory(req, res) {
   const rows = authService.getLoginHistory();
-  return res.json({ data: { rows, total: rows.length } });
+  return res.json({ data: rows });
 }
 
 function getLoginHistoryStats(req, res) {
   return res.json({ data: authService.getLoginHistoryStats() });
 }
 
-module.exports = { login, postLoginHistory, getLoginHistory, getLoginHistoryStats };
+module.exports = { login, logout, postLoginHistory, getLoginHistory, getLoginHistoryStats };

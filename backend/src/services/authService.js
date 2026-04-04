@@ -1,25 +1,64 @@
 const loginHistoryRepository = require("../repositories/loginHistoryRepository");
-const profileRepository = require("../repositories/profileRepository");
+const profileService = require("./profileService");
 const { makeId } = require("../utils/id");
 
-const SUPPORTED_ROLES = ["staff", "admin", "customer"];
+const SUPPORTED_ROLES = ["owner", "staff", "customer"];
+
+const DEMO_USERS = [
+  {
+    id: "owner-demo",
+    name: "Owner Demo",
+    email: "owner@happytails.local",
+    password: "owner123",
+    role: "owner"
+  },
+  {
+    id: "staff-demo",
+    name: "Staff Demo",
+    email: "staff@happytails.local",
+    password: "staff123",
+    role: "staff"
+  },
+  {
+    id: "customer-demo",
+    name: "Customer Demo",
+    email: "customer@happytails.local",
+    password: "customer123",
+    role: "customer"
+  }
+];
 
 function normalizeRole(role) {
   const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "admin") return "owner";
   return SUPPORTED_ROLES.includes(normalized) ? normalized : "customer";
 }
 
 function login(payload) {
   const email = String(payload.email || "").trim().toLowerCase();
-  const password = String(payload.password || "");
+  const password = String(payload.password || "").trim();
   if (!email || !password) return null;
 
-  const role = normalizeRole(payload.role);
-  const profile = profileRepository.findAll().find((p) => String(p.email || "").toLowerCase() === email);
+  const requestedRole = normalizeRole(payload.role);
+  const matchedDemo = DEMO_USERS.find((entry) => entry.email === email && entry.password === password);
+  if (!matchedDemo) return null;
+
+  const role = requestedRole === matchedDemo.role ? matchedDemo.role : matchedDemo.role;
+
+  if (role === "customer") {
+    const profile = profileService.getProfile(matchedDemo.id);
+    return {
+      id: profile.id,
+      customerCode: profile.customerCode,
+      name: profile.name || matchedDemo.name,
+      email,
+      role
+    };
+  }
 
   return {
-    id: profile?.id || makeId("user"),
-    name: profile?.name || payload.name || email.split("@")[0] || "User",
+    id: matchedDemo.id,
+    name: matchedDemo.name,
     email,
     role
   };
@@ -55,10 +94,11 @@ function getLoginHistoryStats() {
     const loginDate = String(row.loginTime || "").slice(0, 10);
     if (loginDate === today) acc.totalToday += 1;
     if (String(row.loginStatus || "").toLowerCase() !== "success") acc.failed += 1;
+    if (row.role === "owner") acc.owner += 1;
     if (row.role === "staff") acc.staff += 1;
     if (row.role === "customer") acc.customer += 1;
     return acc;
-  }, { totalToday: 0, failed: 0, staff: 0, customer: 0 });
+  }, { totalToday: 0, failed: 0, owner: 0, staff: 0, customer: 0 });
 }
 
 module.exports = { login, logLoginHistory, getLoginHistory, getLoginHistoryStats };

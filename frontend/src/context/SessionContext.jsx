@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { createUserIdentity, getSessionStorageKey, getStoredSession } from "../services/sessionService";
+import { clearAllSessionData, createUserIdentity, getSessionStorageKey, getStoredSession } from "../services/sessionService";
 
 const SESSION_STORAGE_KEY = getSessionStorageKey();
 
@@ -48,11 +48,11 @@ export function SessionProvider({ children }) {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(enhanced));
   }, []);
 
-  const signIn = useCallback(({ email, fullName }) => {
+  const signIn = useCallback(({ id, email, fullName, role, customerCode }) => {
     const now = new Date().toISOString();
     persistSession({
       status: "authenticated",
-      user: createUserIdentity({ email, fullName, status: "authenticated" }),
+      user: createUserIdentity({ id, email, fullName, role, customerCode, status: "authenticated" }),
       lastLoginAt: now,
       lastActiveAt: now
     });
@@ -70,6 +70,7 @@ export function SessionProvider({ children }) {
 
   const signOut = useCallback(() => {
     setSession({ status: "anonymous", user: null, lastLoginAt: null, lastActiveAt: null });
+    clearAllSessionData();
     localStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 

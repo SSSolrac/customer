@@ -2,6 +2,7 @@ const orderRepository = require("../repositories/orderRepository");
 const { mapCreateOrderPayload } = require("../mappers/orderMapper");
 const { makeId } = require("../utils/id");
 const { storeReceiptDataUrl } = require("../utils/receiptStorage");
+const menuService = require("./menuService");
 
 function appendHistory(orderId, status, { note = null, changedByUserId = null } = {}) {
   const historyEntry = {
@@ -22,6 +23,17 @@ function withHistory(order) {
 }
 
 function createOrder(payload) {
+  const menuById = new Map(menuService.getMenu().map((entry) => [entry.id, entry]));
+  const blockedItem = (payload.items || []).find((entry) => {
+    const menuItem = menuById.get(entry.menuItemId || entry.id);
+    return menuItem && menuItem.isAvailable === false;
+  });
+  if (blockedItem) {
+    const error = new Error("Unavailable menu items cannot be ordered.");
+    error.status = 400;
+    throw error;
+  }
+
   const canonicalOrder = mapCreateOrderPayload(payload);
 
   const receiptDataUrl = payload?.receiptImageUrl;
