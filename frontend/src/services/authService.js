@@ -5,6 +5,11 @@ export async function login(payload) {
   return unwrapData(response, null);
 }
 
+export async function signup(payload) {
+  const response = await requestJson("/auth/signup", { method: "POST", body: payload });
+  return unwrapData(response, null);
+}
+
 export async function logout(payload) {
   await requestJson("/auth/logout", { method: "POST", body: payload || {} });
 }

@@ -1,4 +1,5 @@
 const loginHistoryRepository = require("../repositories/loginHistoryRepository");
+const userRepository = require("../repositories/userRepository");
 const profileService = require("./profileService");
 const { makeId } = require("../utils/id");
 
@@ -34,31 +35,104 @@ function normalizeRole(role) {
   return SUPPORTED_ROLES.includes(normalized) ? normalized : "customer";
 }
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 function login(payload) {
-  const email = String(payload.email || "").trim().toLowerCase();
+  const email = normalizeEmail(payload.email);
   const password = String(payload.password || "").trim();
   if (!email || !password) return null;
 
-  const requestedRole = normalizeRole(payload.role);
   const matchedDemo = DEMO_USERS.find((entry) => entry.email === email && entry.password === password);
-  if (!matchedDemo) return null;
+  if (matchedDemo) {
+    const role = matchedDemo.role;
 
-  const role = requestedRole === matchedDemo.role ? matchedDemo.role : matchedDemo.role;
+    if (role === "customer") {
+      const profile = profileService.getProfile(matchedDemo.id);
+      return {
+        id: profile.id,
+        customerCode: profile.customerCode,
+        name: profile.name || matchedDemo.name,
+        email,
+        role
+      };
+    }
 
+    return {
+      id: matchedDemo.id,
+      name: matchedDemo.name,
+      email,
+      role
+    };
+  }
+
+  const stored = userRepository.findByEmail(email);
+  if (!stored || String(stored.password || "").trim() !== password) return null;
+
+  const role = normalizeRole(stored.role);
   if (role === "customer") {
-    const profile = profileService.getProfile(matchedDemo.id);
+    const profile = profileService.upsertProfile(stored.id, { name: stored.name, email });
     return {
       id: profile.id,
       customerCode: profile.customerCode,
-      name: profile.name || matchedDemo.name,
+      name: profile.name || stored.name,
       email,
       role
     };
   }
 
   return {
-    id: matchedDemo.id,
-    name: matchedDemo.name,
+    id: stored.id,
+    name: stored.name,
+    email,
+    role
+  };
+}
+
+function signup(payload) {
+  const fullName = String(payload.fullName || payload.name || "").trim();
+  const email = normalizeEmail(payload.email);
+  const password = String(payload.password || "").trim();
+  const role = normalizeRole(payload.role);
+
+  if (!fullName || !email || !password) {
+    const error = new Error("fullName, email, and password are required.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (DEMO_USERS.some((user) => user.email === email) || userRepository.findByEmail(email)) {
+    const error = new Error("Email already exists.");
+    error.status = 409;
+    throw error;
+  }
+
+  const now = new Date().toISOString();
+  const user = userRepository.create({
+    id: makeId("user"),
+    name: fullName,
+    email,
+    password,
+    role,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  if (role === "customer") {
+    const profile = profileService.upsertProfile(user.id, { name: fullName, email });
+    return {
+      id: profile.id,
+      customerCode: profile.customerCode,
+      name: profile.name || fullName,
+      email,
+      role
+    };
+  }
+
+  return {
+    id: user.id,
+    name: user.name,
     email,
     role
   };
@@ -101,4 +175,4 @@ function getLoginHistoryStats() {
   }, { totalToday: 0, failed: 0, owner: 0, staff: 0, customer: 0 });
 }
 
-module.exports = { login, logLoginHistory, getLoginHistory, getLoginHistoryStats };
+module.exports = { login, signup, logLoginHistory, getLoginHistory, getLoginHistoryStats };

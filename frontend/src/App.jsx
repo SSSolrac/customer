@@ -20,7 +20,8 @@ import TrackOrder from "./pages/TrackOrder";
 import Notifications from "./pages/Notifications";
 import pattern from "./assets/pattern.png";
 import { useSession } from "./context/SessionContext";
-import { createLoginHistory, login as loginRequest, logout as logoutRequest } from "./services/authService";
+import { createLoginHistory, login as loginRequest, logout as logoutRequest, signup as signupRequest } from "./services/authService";
+import { getApiBaseUrl, isApiAvailableError } from "./services/api";
 
 function ProtectedRoute({ children }) {
   const { canAccessAccount } = useSession();
@@ -54,8 +55,20 @@ function App() {
   }, [location.pathname]);
 
   const handleLogin = async (credentials) => {
-    const user = await loginRequest({ email: credentials.email, password: credentials.password, role: credentials.role });
-    if (!user) throw new Error("Invalid credentials.");
+    let user = null;
+
+    try {
+      user = credentials.isSignup
+        ? await signupRequest({ fullName: credentials.fullName, email: credentials.email, password: credentials.password, role: credentials.role })
+        : await loginRequest({ email: credentials.email, password: credentials.password, role: credentials.role });
+    } catch (error) {
+      if (isApiAvailableError(error)) {
+        throw new Error(`Unable to reach the backend API at ${getApiBaseUrl()}. Start the server in customer/backend and try again.`);
+      }
+      throw error;
+    }
+
+    if (!user) throw new Error(credentials.isSignup ? "Unable to create account." : "Invalid credentials.");
 
     signIn({
       id: user.id,
@@ -65,7 +78,11 @@ function App() {
       customerCode: user.customerCode
     });
 
-    await createLoginHistory({ id: user.id, name: user.name, email: user.email, role: user.role, loginStatus: "success" });
+    try {
+      await createLoginHistory({ id: user.id, name: user.name, email: user.email, role: user.role, loginStatus: "success" });
+    } catch {
+      // best effort API logging
+    }
     setShowModal(false);
   };
 
